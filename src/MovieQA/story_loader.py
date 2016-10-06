@@ -100,13 +100,24 @@ class StoryLoader(object):
           ValueError: If input story type is not supported.
         """
         story = {}
+        """
+    imdb_key
+        tt0281358
+    movie
+        Movie(name=u'A Walk to Remember', year=u'2002', genre=u'Drama, Romance', text=TextSource(plot=u'story/plot/tt0281358.wiki', dvs=None, subtitle=u'story/subtt/tt0281358.srt', script=u'story/script/tt0281358.script'), video=None)
+        """
         for imdb_key, movie in movies_map.iteritems():
+            # Make sure you do want plot
             if story_type == 'plot':
+                # Make sure this movie has a plot
                 if not movie.text.plot:
                     continue
+                # Get the path to the the plot for this movie
                 plot_filename = os.path.join(PKG, movie.text.plot)
+                # Make sure the path isn't broken
                 if not self._check_exists(plot_filename):
                     continue
+                # Read the plot for this movie
                 this_story = self._read_plot(plot_filename)
 
             elif story_type == 'split_plot':
@@ -143,6 +154,7 @@ class StoryLoader(object):
             else:
                 raise ValueError('Unsupported story type!')
 
+            # Key this imdb_key for the plot for this story
             story[imdb_key] = this_story
 
         if not story:

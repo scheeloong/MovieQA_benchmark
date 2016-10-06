@@ -1,5 +1,7 @@
 # MovieQA
 
+sudo easy_install pysrt
+
 <strong>MovieQA: Understanding Stories in Movies through Question-Answering</strong>  
 Makarand Tapaswi, Yukun Zhu, Rainer Stiefelhagen, Antonio Torralba, Raquel Urtasun, and Sanja Fidler  
 IEEE Conference on Computer Vision and Pattern Recognition (CVPR), Las Vegas, June 2016.  

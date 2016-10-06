@@ -18,23 +18,35 @@ import story_loader
 TextSource = namedtuple('TextSource', 'plot dvs subtitle script')
 
 # TODO: add characters info
+# Make a MovieInfo tuple
 MovieInfo = namedtuple('Movie', 'name year genre text video')
 
 QAInfo = namedtuple('QAInfo',
                     'qid question answers correct_index imdb_key video_clips')
 
+"""
+The pubic methods you need are:
+    def get_story_qa_data(self, split='train', story_type='plot'):
+    def get_video_list(self, split='train', video_type='qa_clips'):
+"""
 class DataLoader(object):
     """MovieQA: Data loader class"""
 
     def __init__(self):
         self.load_me_stories = story_loader.StoryLoader()
 
+        # Dictionary of all the movies
         self.movies_map = dict()
+        # List of all the questions
         self.qa_list = list()
+        # Dictionary for the splits (train, val, test)
         self.data_split = dict()
 
+        # Create a map of (imdb_key, MovieInfo) and its inversed map.
         self._populate_movie()
+        # To create a split of train and test set
         self._populate_splits()
+        # To create a list of the question ansd answers
         self._populate_qa()
         print 'Initialized MovieQA data loader!'
 
@@ -49,6 +61,7 @@ class DataLoader(object):
             t = movie['text']
             ts = TextSource(t['plot'], t['dvs'], t['subtitle'], t['script'])
             vs = None
+            # Map the movies by the key to a MovieInfo named tuple
             self.movies_map[movie['imdb_key']] = MovieInfo(
                 movie['name'], movie['year'], movie['genre'], ts, vs)
 
@@ -142,6 +155,8 @@ class DataLoader(object):
         # Load story
         this_movies_map = {k: v for k, v in self.movies_map.iteritems()
                            if k in this_split_movies}
+        # story is a key value pair of 
+        # ['tt012345'] = "plot for this movie"
         story = self.load_me_stories.load_story(this_movies_map, story_type)
 
         # Restrict this split movies to ones which have a story,
@@ -149,6 +164,8 @@ class DataLoader(object):
         this_split_movies = [m for m in this_split_movies if m in story]
         qa = [qa for qa in self.qa_list if qa.imdb_key in this_split_movies]
 
+        # story is same type as 
+        # qa is same type as qa_list
         return story, qa
 
 
