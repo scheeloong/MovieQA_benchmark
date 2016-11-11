@@ -2,7 +2,8 @@ import math
 import numpy as np
 import tensorflow as tf
 import pickle
-
+from src.movietokenizer import MovieTokenizer
+from src.sparsematrix import SparseMatrix
 # TODO: Replace all instances of shouldLog with a proper logger
 shouldLog = True
 
@@ -21,30 +22,38 @@ class TfIdf(object):
         Story are the list of all available plots for the movie.
         Each plot contains a number of
         """
+
+        # Tokenize alphanumeric with dash, lowercase, stem.  
+        self.tokenizer = MovieTokenizer("[\w]+")
+
         # All the stories 
         #   Format is:
         #       [keyForStory, allPlotsForStory]
         self.story = story
 
-        # The number of stories in this class
-        self.numberOfStories = len(self.story)
-
         # A set for all possible vocabulary
-        self.vocabularySet = self.getVocabulary()
-
+        self.vocabularySet = set()
         # A map for each movie to it's vocabulary set
         # Used by IDF score calculation
         self.movieToVocabularySet = {}
 
-        for currMovieKey in self.story:
-            self.movieToVocabularySet[currMovieKey] = self.getVocabularyForMovie(currMovieKey)
+        # Initialize both vocabularySet and movieVocabularySet
+        self.initVocabulary()
 
-        # Number of distinct words in the vocabularySet
+        # The number of stories in this class
+        self.numberOfStories = len(self.story)
         self.numberOfWords = len(self.vocabularySet)
-
         print 'Number of stories: ' + str(self.numberOfStories)
         print 'Number of Words: ' + str(self.numberOfWords)
-        # arr[words][movieId]
+        # A sparse matrix for tfIdfMatrix
+        self.tfIdfMatrix = SparseMatrix(self.vocabularySet, self.story)
+
+        self.idfVec = np.zeros(self.numberOfWords)
+        for currWord in self.vocabularySet:
+            self.idfVec[self.tfIdfMatrix.getWordIndex(currWord)] = self.inverseDocumentFrequency(currWord)
+
+        # Can remove movieToVocabularySet since no longer need it after this
+        self.movieToVocabularySet = {}
 
         # Get the tfIdfMatrix
         if loadFile is None:
@@ -53,6 +62,7 @@ class TfIdf(object):
             self.tfIdfMatrix = self.loadTfIdfMatrix(loadFile)
         if shouldLog:
             print self.tfIdfMatrix
+
         # The matrix dimension is (|Vocabulary Size| * numberOfStories)
         # But excluded those with tfidf score below a certain threshold
         """
@@ -79,75 +89,77 @@ class TfIdf(object):
         """
         This method trains an entire new tfIdfMatrix and serializes it to file.
         """
-        tfIdfMatrix = {}
-        # TODO: Clean up words with nltk (get rid of ',' and match similar words)
-        count = 0
         limitVocabForTesting = 15000 # TODO: Set this as a parameter
-        for currWord in self.vocabularySet:
-            if shouldLog:
-                print "Training word: " + currWord
-            exist = False
-            if count > limitVocabForTesting:
-                break
-            idfScore = self.inverseDocumentFrequency(currWord)
-            # Skip this word if it is useless ('the')
-            if (idfScore < tfIdfThreshold):
-                continue
-            # Calculate the tfidf score for every word
-            for currMovieKey in self.story:
-                # Calculate the tfScore for this word in this movie
-                tfScore = self.termFrequency(currWord, self.story[currMovieKey])
-                if tfScore == 0.0:
-                    continue
+        count = 0
+        for currMovieKey in self.story:
+            print str(count) + ". Training movie: " + str(currMovieKey)
+            countOfWords = self.tokenizer.tokenizeDuplicate(self.story[currMovieKey])
+            for word in countOfWords:
+                tfScore = countOfWords[word]
+                idfScore = self.idfVec[self.tfIdfMatrix.getWordIndex(word)]
                 tfIdfScore = tfScore * idfScore
+                '''
                 if shouldLog:
                     print "tfscore: " + str(tfScore)
                     print "idfscore: " + str(idfScore)
                     print "tfidfscore: " + str(tfIdfScore)
+                '''
                 if tfIdfScore >= tfIdfThreshold:
-                    tfIdfMatrix[currWord,currMovieKey] = tfIdfScore
-                    exist = True
-            if exist:
-                count += 1.0
+                    self.tfIdfMatrix.setScore(word, currMovieKey, tfIdfScore)
+            count += 1
         with  open('tfIdfMatrix.obj', 'wb') as fp:
-            pickle.dump(tfIdfMatrix, fp)
+            pickle.dump(self.tfIdfMatrix, fp)
         return 'tfIdfMatrix.obj'
 
-    def getVocabularyForMovie(self, currMovieKey):
-        """
-        Returns a set of all vocabulary for a given movie
-        """
-        vocabulary = set()
-        currMoviePlots = self.story[currMovieKey]
-        for currPlot in currMoviePlots:
-            for word in currPlot.split():
-                vocabulary.add(word)
-        return vocabulary
-
-    def getVocabulary(self):
+    def initVocabulary(self):
         """
         Returns all the distinct words from all movies as a set
         """
-        vocabulary = set()
         for currMovieKey in self.story:
             currMoviePlots = self.story[currMovieKey]
+            self.movieToVocabularySet[currMovieKey] = set()
             for currPlot in currMoviePlots:
-                for word in currPlot.split():
-                    vocabulary.add(word)
-        return vocabulary
+                self.movieToVocabularySet[currMovieKey].update(self.tokenizer.tokenizeAlphanumericLower(currPlot))
+            self.vocabularySet.update(self.movieToVocabularySet[currMovieKey])
+
+    '''
+    # TODO: Replace this with python Collection counter class to count much faster Counter
+    #       BUT MAYBE NOT CAUSE EVERY MOVIE LOOPS THROUGH SAME WORDS AGAIN
+    #       A FASTER APPROACH MIGHT BE TO STORE MORE MEMORY
+    #       EXAMPLE, STORE COUNTER CLASS FOR EVERY MOVIE
+    #       STORE INVERTED INDEX FROM WORDS TO MOVIES THEY APPEAR IN
+    #       SINCE MORE WORDS THAN MOVIES
+    #       THINK ABOUT THIS ON PAPER THEN IMPLEMENT, DON'T IMPLEMENT BLINDLY
+    #       FASTEST WAY SHOULD BE STORING ALL COUNTERS FOR EACH MOVIE
+    #       STORING ALL IDF FOR EACH WORD LIKE YOU HAVE DONE
+    #       THEN ITERATE THROUGH EVERY EVERY MOVIE and EVERY WORD ONCE
+    #       since you need to go through VxM anyway to fill up matrix
+    #       iterate the way that utilizes caches the best
+    #       VxM = 12000 * 300 => 3600000 Million iterations, which may or may not be big
+
+    #       LOL, YOU ARE LITERALLY ITERATING A DOCUMENT FOR EVERYWORD
+    #       INSTEAD OF COUNTING AS YOU ITERATE THE DOCUMENT ONCE.
+
+
+    #       Space memory analysis
+            IdfVec is 12k * 1 => 12k memory
+            Counter would be 12k * 293 => Large memory
+            Thus, only store counter for each movie for each iteration => 12k * 1 memory and override
+            And you wouldn't need to read it again after each movie so can override
+            This is basically dynamic programming =) 
+    '''
 
     def termFrequency(self, word, plots):
         """ 
+        OBSOLETE
         Returns term frequency score
         for a given word in plots
         """
-        totalWordsInPlots = 0.0
         count = 0.0
         for currPlot in plots:
-            totalWordsInPlots += len(currPlot.split())
-            for currWord in currPlot.split():
-                if word.lower() == currWord.lower():
-                    count += 1.0
+            # TODO: Figure out if this is better or if previous approach of
+            # number of plots word appears in is better
+            count += self.tokenizer.countOccurence(currPlot, word)
         return count
         '''
         TODO: Replace with logger class
@@ -173,10 +185,12 @@ class TfIdf(object):
         return math.log(len(self.story)/count, 2)
 
     def getSentenceVector(self, movieKey, sentence):
-        sentenceVec = {}
-        for currWord in sentence.split():
-            if (currWord, movieKey) in self.tfIdfMatrix.keys():
-                sentenceVec[currWord] = self.tfIdfMatrix[currWord, movieKey]
+        sentenceVec = np.zeros(self.numberOfWords)
+        cleanSentence = self.tokenizer.tokenizeAlphanumericLower(sentence)
+        for currWord in cleanSentence:
+            # Only values if it exist in the sparseMatrix
+            if self.tfIdfMatrix.contains(currWord, movieKey):
+                sentenceVec[self.tfIdfMatrix.getWordIndex(currWord)] = self.tfIdfMatrix.getScore(currWord, movieKey)
         return sentenceVec
 
     '''
