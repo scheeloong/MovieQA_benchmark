@@ -5,7 +5,7 @@ import pickle
 from src.movietokenizer import MovieTokenizer
 from src.sparsematrix import SparseMatrix
 # TODO: Replace all instances of shouldLog with a proper logger
-shouldLog = True
+shouldLog = False
 
 class TfIdf(object):
     """
@@ -14,6 +14,8 @@ class TfIdf(object):
     algorithm that is used for word embedding
     It serializes the trained words using pickle if it isn't already trained
     and deserialize the trained words from pickle"""
+    
+    # It doesn't normalize the TFIDF score as they are rank invariant
 
     # TODO: Implement serializing, checking if serialized to skip serialization
     # TODO: Implement deserializing
@@ -55,13 +57,16 @@ class TfIdf(object):
         # Can remove movieToVocabularySet since no longer need it after this
         self.movieToVocabularySet = {}
 
+        self.initTfIdfMatrix(0.0)
+        #self.initTfIdfMatrix(0.001)
+
+        ''''
         # Get the tfIdfMatrix
         if loadFile is None:
             self.tfIdfMatrix = self.getTfIdfMatrix(0.001)
-        else:
-            self.tfIdfMatrix = self.loadTfIdfMatrix(loadFile)
         if shouldLog:
             print self.tfIdfMatrix
+        '''
 
         # The matrix dimension is (|Vocabulary Size| * numberOfStories)
         # But excluded those with tfidf score below a certain threshold
@@ -75,8 +80,11 @@ class TfIdf(object):
 
 
     def getTfIdfMatrix(self, tfIdfThreshold):
+        '''
         fileName = self.saveTfIdfMatrix(tfIdfThreshold)
         return self.loadTfIdfMatrix(fileName)
+        '''
+        self.initTfIdfMatrix(tfIdfThreshold)
 
     def loadTfIdfMatrix(self, fileName):
         """ 
@@ -85,17 +93,18 @@ class TfIdf(object):
         with open(fileName, 'rb') as fp:
             return pickle.load(fp)
 
-    def saveTfIdfMatrix(self, tfIdfThreshold):
+    def initTfIdfMatrix(self, tfIdfThreshold):
         """
         This method trains an entire new tfIdfMatrix and serializes it to file.
         """
         limitVocabForTesting = 15000 # TODO: Set this as a parameter
-        count = 0
+        # count = 0
         for currMovieKey in self.story:
-            print str(count) + ". Training movie: " + str(currMovieKey)
-            countOfWords = self.tokenizer.tokenizeDuplicate(self.story[currMovieKey])
+            # print str(count) + ". Training movie: " + str(currMovieKey)
+            # count += 1
+            countOfWords = self.tokenizer.tokenizeDuplicatePerSentence(self.story[currMovieKey])
             for word in countOfWords:
-                tfScore = countOfWords[word]
+                tfScore = np.log10(countOfWords[word]) + 1.0
                 idfScore = self.idfVec[self.tfIdfMatrix.getWordIndex(word)]
                 tfIdfScore = tfScore * idfScore
                 '''
@@ -106,10 +115,12 @@ class TfIdf(object):
                 '''
                 if tfIdfScore >= tfIdfThreshold:
                     self.tfIdfMatrix.setScore(word, currMovieKey, tfIdfScore)
-            count += 1
+        '''
+        OBSOLETE as it takes less than 20  seconds to train now, don't need to waste time saving
         with  open('tfIdfMatrix.obj', 'wb') as fp:
             pickle.dump(self.tfIdfMatrix, fp)
         return 'tfIdfMatrix.obj'
+        '''
 
     def initVocabulary(self):
         """
@@ -182,7 +193,7 @@ class TfIdf(object):
         if count == 0.0:
             # returns 0.0 if it doesn't exist from the vocabulary
             return count
-        return math.log(len(self.story)/count, 2)
+        return np.log10(len(self.story)/count)
 
     def getSentenceVector(self, movieKey, sentence):
         sentenceVec = np.zeros(self.numberOfWords)

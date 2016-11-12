@@ -20,7 +20,9 @@ def runTfIdf(trainPlots, testQuestions):
     #       which must be consistent with file passed in
     # TODO: Compile if it doesn't exist yet, skip compilation if already stored data.
     #tfidf_ = TfIdf(trainPlots, 'tfIdfMatrix.obj')
+    startTime = datetime.datetime.now()
     tfidf_ = TfIdf(trainPlots)
+    endTime = datetime.datetime.now()
     # Run validation test
     numChoices = np.array([0, 0, 0, 0, 0])
     corrChoices = np.array([0, 0, 0, 0, 0])
@@ -58,17 +60,28 @@ def runTfIdf(trainPlots, testQuestions):
         corrChoices[currQA.correct_index] += 1
         if choice == currQA.correct_index:
             numCorrect += 1
-        if not (currQaNum % 50):
+        '''
+        if not (currQaNum % 1000):
             print numChoices
             print corrChoices
             print 'numCorrect: ' + str(numCorrect) 
             print 'Accurary: ' + str((numCorrect*1.0)/currQaNum)
+            print 'currQaNum: ' + str(currQaNum)
             print 'NumQuestions: ' + str(numQuestions)
+        '''
     print 'numCorrect: ' + str(numCorrect)
     print 'numQuestions: ' + str(numQuestions)
-    print 'numChoices: ' + str(numChoices)
+    print 'chosen Answers: ' + str(numChoices)
+    print 'correct Answers: ' + str(corrChoices)
     print 'currQaNum: ' + str(currQaNum)
     print 'Accurary: ' + str((numCorrect*1.0)/numQuestions)
+    print 'StartTrainingTime: ' + str(startTime.time())
+    print 'EndTrainingTime: ' + str(endTime.time())
+    elapsedTime = endTime - startTime
+    hours, remainder = divmod(elapsedTime.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    totalDays = elapsedTime.days
+    print 'Traing Time: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
 #---------------------------------------------------------------------------------------------
 if __name__ == "__main__":
     startTime = datetime.datetime.now()
@@ -81,12 +94,12 @@ if __name__ == "__main__":
     #       from qaTrain which means you can't fetch the sentence vectors for it.
     runTfIdf(storyTrain, qaTrain)
     endTime = datetime.datetime.now()
-    print 'StartTime: ' + str(startTime.time())
-    print 'EndTime: ' + str(endTime.time())
+    print 'TotalStartTime: ' + str(startTime.time())
+    print 'TotalEndTime: ' + str(endTime.time())
     elapsedTime = endTime - startTime
     hours, remainder = divmod(elapsedTime.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     totalDays = elapsedTime.days
-    print 'Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
+    print 'Total Time Taken: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
 
 #---------------------------------------------------------------------------------------------

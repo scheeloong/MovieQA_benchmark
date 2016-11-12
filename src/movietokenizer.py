@@ -14,10 +14,27 @@ class MovieTokenizer(object):
                 count += 1.0
         return count
 
-    def tokenizeDuplicate(self, sentences):
+    def tokenizeDuplicatePerSentence(self, sentences):
         # Repeat the elements for counting
+        # but only one time for each sentence
         vocabulary = {}
         for sentence in sentences:
+            # Use set to make sure every word is unique
+            # within a sentence
+            for word in set(self.tokenizer.tokenize(sentence)):
+                word = self.ps.stem(word.lower())
+                if word not in vocabulary:
+                    vocabulary[word] = 1
+                else:
+                    vocabulary[word] += 1
+        return vocabulary
+
+    def tokenizeDuplicate(self, sentences):
+        # Repeat the elements for counting 
+        # included repeated times in the same sentence.
+        vocabulary = {}
+        for sentence in sentences:
+            # Don't use set, can have repeated words per sentence
             for word in self.tokenizer.tokenize(sentence):
                 word = self.ps.stem(word.lower())
                 if word not in vocabulary:
