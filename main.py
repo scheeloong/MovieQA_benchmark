@@ -27,6 +27,7 @@ def runTfIdf(trainPlots, testQuestions):
     numChoices = np.array([0, 0, 0, 0, 0])
     corrChoices = np.array([0, 0, 0, 0, 0])
     numQuestions = len(testQuestions)
+    finalAnswers = np.zeros(numQuestions)
     numCorrect = 0
     currQaNum = 0
     for currQA in testQuestions:
@@ -60,6 +61,7 @@ def runTfIdf(trainPlots, testQuestions):
         corrChoices[currQA.correct_index] += 1
         if choice == currQA.correct_index:
             numCorrect += 1
+        finalAnswers[currQaNum-1] = choice
         '''
         if not (currQaNum % 1000):
             print numChoices
@@ -81,7 +83,10 @@ def runTfIdf(trainPlots, testQuestions):
     hours, remainder = divmod(elapsedTime.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     totalDays = elapsedTime.days
-    print 'Traing Time: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
+    print 'Training Time: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
+    return finalAnswers
+    
+    
 #---------------------------------------------------------------------------------------------
 if __name__ == "__main__":
     startTime = datetime.datetime.now()
@@ -92,7 +97,7 @@ if __name__ == "__main__":
     [storyTest, qaTest]  = dL.get_story_qa_data('test', 'plot')
     # TODO: FIgure out how to run qaTest if the movies are totally different 
     #       from qaTrain which means you can't fetch the sentence vectors for it.
-    runTfIdf(storyTrain, qaTrain)
+    finalAnswers = runTfIdf(storyTrain, qaTrain)
     endTime = datetime.datetime.now()
     print 'TotalStartTime: ' + str(startTime.time())
     print 'TotalEndTime: ' + str(endTime.time())
@@ -102,4 +107,9 @@ if __name__ == "__main__":
     totalDays = elapsedTime.days
     print 'Total Time Taken: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
 
+    print 'Answers Chosen'
+    count = 0
+    for val in finalAnswers:
+        print 'test:' + str(count) + ' ' + str(int(val))
+        count += 1
 #---------------------------------------------------------------------------------------------
