@@ -1,11 +1,26 @@
 from nltk.tokenize import word_tokenize, RegexpTokenizer
-from nltk.stem import PorterStemmer
+from nltk.stem import PorterStemmer, LancasterStemmer, SnowballStemmer, WordNetLemmatizer
 
 class MovieTokenizer(object):
 
     def __init__(self, tokenizeRegExp):
         self.tokenizer = RegexpTokenizer(tokenizeRegExp)
         self.ps = PorterStemmer()
+        self.ls = LancasterStemmer()
+        self.ss = SnowballStemmer("english")
+        #self.stemmer = self.ls # 46.2 on training set
+        #self.stemmer = self.ps # 46.77 on training set
+        self.stemmer = self.ss # 46.79 on training set
+        self.lemmatizer = WordNetLemmatizer() # 47.5 on training set
+
+    def usePorterStemmer(self):
+        self.stemmer = self.ps
+
+    def useLancasterStemmer(self):
+        self.stemmer = self.ls
+
+    def useSnowballStemmer(self):
+        self.stemmer = self.ss
 
     def countOccurence(self, sentences, word):
         count = 0.0
@@ -22,7 +37,9 @@ class MovieTokenizer(object):
             # Use set to make sure every word is unique
             # within a sentence
             for word in set(self.tokenizer.tokenize(sentence)):
-                word = self.ps.stem(word.lower())
+                word = word.lower()
+                #word = self.stemmer.stem(word)
+                word = self.lemmatizer.lemmatize(word)
                 if word not in vocabulary:
                     vocabulary[word] = 1
                 else:
@@ -36,7 +53,9 @@ class MovieTokenizer(object):
         for sentence in sentences:
             # Don't use set, can have repeated words per sentence
             for word in self.tokenizer.tokenize(sentence):
-                word = self.ps.stem(word.lower())
+                word = word.lower()
+                #word = self.stemmer.stem(word)
+                word = self.lemmatizer.lemmatize(word)
                 if word not in vocabulary:
                     vocabulary[word] = 1
                 else:
@@ -50,6 +69,10 @@ class MovieTokenizer(object):
         """
         vocabulary = set()
         for word in self.tokenizer.tokenize(sentences):
-            vocabulary.add(self.ps.stem(word.lower()))
+            word = word.lower()
+            #word = self.stemmer.stem(word)
+            word = self.lemmatizer.lemmatize(word)
+            vocabulary.add(word)
+            #vocabulary.add(self.stemmer.stem(word.lower()))
         return vocabulary
 
