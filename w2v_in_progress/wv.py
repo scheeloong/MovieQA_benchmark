@@ -260,10 +260,10 @@ with tf.Session(graph=graph) as session:
 
         #Estimate loss
         if step %2000 ==0 and step !=0:
-            average_loss = total_loss/2000
-            loss_values.append(average_loss)
+            
+            loss_values.append(total_loss/2000)
            
-            average_loss = 0
+            total_loss = 0
 
         #Save data?
         start_index =+1
