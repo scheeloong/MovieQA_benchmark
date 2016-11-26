@@ -1,0 +1,202 @@
+##word2vec implementation up to Oct 20
+"""Based on the code from: https://github.com/ryankiros/skip-thoughts/blob/master/skipthoughts.py"""
+from __future__ import print_function
+import os
+import math
+import random
+import string
+import zipfile
+import collections
+import random
+import zipfile
+
+import tensorflow as tf
+import numpy as np
+
+from matplotlib import pylab
+from six.moves import range
+from six.moves.urllib.request import urlretrieve
+from sklearn.manifold import TSNE
+
+
+from collections import OrderedDict, defaultdict, Counter, deque
+
+
+vocabulary = Counter() #Map of word to # instances 
+
+path = '/nfs/ug/homes-3/v/vukovic8/Desktop/ECE496/MovieQA_benchmark-master/story/plot'
+#Index in 1-hot vector
+hot_indices_map = {'UNK':0}
+hot_indices = []
+
+vocabulary_size = 50000
+min_freq = 5 #Minimum number of times a words must appear to be recognized
+
+all_text_data = ''
+
+
+
+
+
+#MovieQA files
+def load_files():
+    """Opens all files and loads into dict"""
+    """Also loads all files into single string for training"""
+    parsed_movie_dict = {}
+    #Get the files
+    file_list= os.listdir(path)
+
+    for file_i in file_list:
+        filename = file_i
+        with open(path + '/' + filename) as file:
+            text = file.read()
+
+            parsed_file = word_parse(text)
+            parsed_movie_dict[filename] = parsed_file
+            
+            all_text_data = all_text_data + parsed_file
+
+    
+    
+    return (parsed_movie_dict, all_text_data)  
+
+
+def word_parse(input_text):
+    """given a file, remove all punctuation/capitalization and 
+    place all words into a list.
+    """
+    word_list = []
+
+    #Remove all capitalization from input text
+    input_text = input_text.lower()
+    input_text = input_text.replace(',', '')
+    input_text = input_text.replace('\n', ' ')
+    input_text = input_text.replace(':', '')
+    input_text = input_text.replace(';', '')
+    input_text = input_text.replace('(', '')
+    input_text = input_text.replace(')', '')
+    input_text = input_text.replace('!', '')
+    input_text = input_text.replace('?', '')
+    input_text = input_text.replace('.', '')
+
+
+    word_list = input_text.split()
+
+    
+    return word_list
+
+def generate_vocabulary(parsed_movie_dict):
+    '''Add words to vocabulary and update word frequency'''
+    for movie in parsed_movie_dict:
+
+        for word in parsed_movie_dict[movie]:
+
+            if word in vocabulary:
+                vocabulary[word] +=1
+            else:
+                vocabulary[word] = 1
+
+def vocab_to_one_hot(recognized_words):
+    
+    for _, word in enumerate(vocabulary):
+
+        if word in recognized_words:
+            index = len(hot_indices)
+            hot_indices_map[word] = index
+            hot_indices.append(index)
+        else:
+            #Unknown word
+            hot_indices_map[word] = 0
+
+
+#Vocab setup
+(parsed_movie_dict, all_text_data) = load_files()
+generate_vocabulary(parsed_movie_dict)
+
+
+
+#Graph parameters
+dim = 128
+batch_size = 128
+embedding_size = 128 #Embedding vector dimension
+graph = tf.Graph()
+
+
+#NOTE TO SELF: FIX GENERATE_BATCH -----------------
+def generate_batch(num_skips, batch_size, data):
+    '''Generates a training batch from the given file'''
+    #Note assumes that num_skips will also be the max distance from the current word
+    #Data is the one-hot index representation of the words in the vocabulary
+    #num_skips is number of skips to do from each center word
+    
+    assert batch_size%num_skips == 0 #Ensure batch size is divisible by number of skips
+    assert num_skips%2 ==0
+
+    data_len = len(data)
+    num_center_words = batch_size/num_skips #number of words to skip from
+    print(data_len)
+    print (num_center_words)
+    print (data_len - num_skips/2 + 2)
+    
+
+    batch = np.ndarray(shape=(batch_size), dtype=np.int32) #Holds the center words of current training batch
+    labels = np.ndarray(shape=(batch_size), dtype=np.int32) #holds the labels of the current training batch
+
+    for i in range(num_center_words):
+        #Fill training batch/labels
+        center_word = num_skips/2 + i
+        for j in range(num_skips/2):
+            batch[num_skips*i +2*j] = data[center_word]
+            batch[num_skips*i +2*j+1] = data[center_word]
+            
+            labels[num_skips*i +2*j] = data[center_word - j-1]
+            labels[num_skips*i +2*j+1] = data[center_word +j +1]
+    
+           
+
+    return(batch,labels)
+
+
+
+#NOTE TO SELF: FIX GENERATE BATCH FIRST!!!! (test.py)
+#TEST ON SCHOOL COMPUTER
+'''with graph.as_default(),tf.device('/cpu:0'):
+    #Initial loss
+    loss = 0
+
+    #The training data (center words) and training labels (predictions)
+    train_data = tf.placeholder(tf.int32, shape=[batch_size])
+    train_label = tf.placeholder(tf.int32, shape=[batch_size])
+    
+    embeddings = tf.Variable(tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0))
+    weights = tf.Variable(tf.truncated_normal([vocabulary_size, embedding_size], stddev=1.0 / math.sqrt(embedding_size)))
+    
+
+
+    #Gradient Descent
+    optimizer = tf.train.AdagradOptimizer(1).minimize(loss)
+'''
+
+    #Cosine similarity here
+
+
+#TRAINING GOES HERE
+#with tf.Session(graph=graph) as session:
+
+#parsed_movies = load_files()
+#generate_vocabulary(parsed_movies)
+#recognized_words = vocabulary.most_common(vocabulary_size) #Set less common words to 0, unknown
+#print(recognized_words)
+
+#recognized_words by frequency??
+
+#Get the 1-hot indices, ordered from most to least frequent
+#for word in vocabulary:
+
+
+#print (vocabulary['the'])
+#print(vocabulary)
+#print (text['tt0256415.wiki'])
+#print(text.keys())
+
+
