@@ -249,19 +249,21 @@ with tf.Session(graph=graph) as session:
     for step in range(num_steps):
         batch_data, batch_labels = generate_batch(num_skips, batch_size, data, start_index)
         #print(batch_labels)
-        batch_labels = np.reshape(batch_labels,(128,1))  #VERIFY RESHAPING THIS!!!
+        batch_labels = np.reshape(batch_labels,(128,1))
         #print(type(batch_labels))
 
         feed_dict = {train_data: batch_data, train_label: batch_labels}
         #print(feed_dict[train_label])
         _,l = session.run([optimizer,loss], feed_dict = feed_dict)
 
-        total_loss+=1
+        total_loss+=l
 
         #Estimate loss
         if step %2000 ==0 and step !=0:
             average_loss = total_loss/2000
             loss_values.append(average_loss)
+           
+            average_loss = 0
 
         #Save data?
         start_index =+1
@@ -272,8 +274,8 @@ with tf.Session(graph=graph) as session:
     pylab.ylabel("Loss")
     pylab.xlabel("Step #")
     pylab.plot(np.arange(1,100000, 2001),loss_values)
-    pylab.show()       
-                
+           
+    pylab.show()            
 
 
 #parsed_movies = load_files()
