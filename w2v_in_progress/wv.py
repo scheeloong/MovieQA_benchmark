@@ -249,7 +249,8 @@ with tf.Session(graph=graph) as session:
     for step in range(num_steps):
         batch_data, batch_labels = generate_batch(num_skips, batch_size, data, start_index)
         #print(batch_labels)
-        
+        batch_labels = np.reshape(batch_labels,(128,1))  #VERIFY RESHAPING THIS!!!
+        #print(type(batch_labels))
 
         feed_dict = {train_data: batch_data, train_label: batch_labels}
         #print(feed_dict[train_label])
