@@ -16,7 +16,7 @@ import numpy as np
 from matplotlib import pylab
 from six.moves import range
 from six.moves.urllib.request import urlretrieve
-from sklearn.manifold import TSNE
+#from sklearn.manifold import TSNE
 
 
 from collections import OrderedDict, defaultdict, Counter, deque
@@ -44,18 +44,20 @@ def load_files():
     #Get the files
     file_list= os.listdir(path)
 
+
     for file_i in file_list:
         filename = file_i
         with open(path + '/' + filename) as file:
             text = file.read()
 
             parsed_file = word_parse(text)
+
             parsed_movie_dict[filename] = parsed_file
 
             #Add to list of all movie text
             all_text_data.extend(parsed_file)
 
-    
+ 
     
     return (parsed_movie_dict, all_text_data)  
 
@@ -162,7 +164,7 @@ def generate_batch(num_skips, batch_size, data, start_index):
         curr_data.append(data[start_index:data_len])
         curr_data.append(data[0:num_extra_words])
     else:
-        curr_data = data[start_index: batch_word_size]
+        curr_data = data[start_index: num_data_words]
 
     batch = np.ndarray(shape=(batch_size), dtype=np.int32) #Holds the center words of current training batch
     labels = np.ndarray(shape=(batch_size), dtype=np.int32) #holds the labels of the current training batch
@@ -184,11 +186,12 @@ def generate_batch(num_skips, batch_size, data, start_index):
 
 
 #Graph parameters
-dim = 128
 window_size = 2
+num_skips = 4
 batch_size = 128
 embedding_dim = 128 #Embedding vector dimension
 start_index = 0
+num_sampled = 64 #Netagive examples
 
 graph = tf.Graph()
 
@@ -196,17 +199,18 @@ graph = tf.Graph()
 
 #NOTE TO SELF: FIX GENERATE BATCH FIRST!!!! (test.py)
 #TEST ON SCHOOL COMPUTER
-'''with graph.as_default(),tf.device('/cpu:0'):
+with graph.as_default(),tf.device('/cpu:0'):
     #Initial loss
     loss = 0
-    num_sampled = 64 #Netagive examples
+    
 
     #The training data (center words) and training labels (predictions)
     train_data = tf.placeholder(tf.int32, shape=[batch_size])
-    train_label = tf.placeholder(tf.int32, shape=[batch_size])
+    train_label = tf.placeholder(tf.int32, shape=[batch_size,1]) #Check shape (num_skips vs 1)
     
-    embeddings = tf.Variable(tf.random_uniform([vocabulary_size, embedding_dim], -1.0, 1.0))
-    weights = tf.Variable(tf.truncated_normal([vocabulary_size, embedding_dim], stddev=1.0 / math.sqrt(embedding_size)))
+    embeddings = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embedding_dim], -1.0, 1.0))
+    embed = tf.nn.embedding_lookup(embeddings, train_data)
+    weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embedding_dim], stddev=1.0 / math.sqrt(embedding_dim)))
 
     #DOUBLE CHECK BIASES
     biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
@@ -214,11 +218,11 @@ graph = tf.Graph()
     
     #Save model variables
     #CHECK THIS ON SCHOOL COMPUTER!!!
-    loss = tf.reduce_mean(tf.nn.sampled_softmax_loss(weights, biases, embeddings, labels, VOCABULARY_SIZE)
-    save = tf.train.Saver()
+    loss = tf.reduce_mean(tf.nn.sampled_softmax_loss(weights, biases, embed, train_label, num_sampled, VOCABULARY_SIZE))
+    #save = tf.train.Saver()
 
     #Gradient Descent
-    optimizer = tf.train.AdagradOptimizer(1).minimize(loss)
+    optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
 
     #Cosine Similarity
     norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings),1, keep_dims=True))
@@ -235,7 +239,7 @@ loss_values = []
 #TRAINING GOES HERE
 with tf.Session(graph=graph) as session:
     #Initialize variables
-    tf.initialize_all_variables.run()
+    tf.initialize_all_variables().run()
     print('Variables initialized')
 
     num_steps = 100001
@@ -244,8 +248,11 @@ with tf.Session(graph=graph) as session:
 
     for step in range(num_steps):
         batch_data, batch_labels = generate_batch(num_skips, batch_size, data, start_index)
+        #print(batch_labels)
+        
 
-        feed_dict = {training_data: batch_data, training_labels: batch_labels}
+        feed_dict = {train_data: batch_data, train_label: batch_labels}
+        #print(feed_dict[train_label])
         _,l = session.run([optimizer,loss], feed_dict = feed_dict)
 
         total_loss+=1
@@ -260,10 +267,14 @@ with tf.Session(graph=graph) as session:
 
     embeddings = normalized_embeddings.eval()
     print("Completed")
+
+    pylab.ylabel("Loss")
+    pylab.xlabel("Step #")
+    pylab.plot(np.arange(1,100000, 2001),loss_values)
            
                 
 
-'''
+
 #parsed_movies = load_files()
 #generate_vocabulary(parsed_movies)
 #recognized_words = vocabulary.most_common(vocabulary_size) #Set less common words to 0, unknown
