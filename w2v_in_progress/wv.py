@@ -272,7 +272,7 @@ with tf.Session(graph=graph) as session:
     pylab.ylabel("Loss")
     pylab.xlabel("Step #")
     pylab.plot(np.arange(1,100000, 2001),loss_values)
-           
+    pylab.show()       
                 
 
 
