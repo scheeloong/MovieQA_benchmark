@@ -53,7 +53,7 @@ def load_files():
             parsed_movie_dict[filename] = parsed_file
 
             #Add to list of all movie text
-            all_text_data.append(parsed_file)
+            all_text_data.extend(parsed_file)
 
     
     
