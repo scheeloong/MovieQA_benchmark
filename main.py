@@ -16,6 +16,12 @@ import logging # TODO: Replace all print with logging class
 
 # This function runs the tfidf on the test methods
 def runTfIdf(trainPlots, testQuestions):
+    # TODO: Plot a histogram for the scores and see how the graph changes
+    #       when you change the algorithm or parameters. 
+    correctFile = open("correctfile.html", "w")
+    wrongFile = open("wrongfile.html", "w")
+    correctFile.write("<HEAD>")
+    wrongFile.write("<HEAD>")
     # FIXME: Class relies on trainPlots to initialize class variables
     #       which must be consistent with file passed in
     # TODO: Compile if it doesn't exist yet, skip compilation if already stored data.
@@ -41,6 +47,7 @@ def runTfIdf(trainPlots, testQuestions):
         AnsD = tfidf_.getSentenceVector(currQA.imdb_key, currQA.answers[3])
         AnsE = tfidf_.getSentenceVector(currQA.imdb_key, currQA.answers[4])
         # TODO: Implement window for plots 
+        chosenPlot = "" # initialize chosen plot for printing
         for currPlot in trainPlots[currQA.imdb_key]:
             PlotVec = tfidf_.getSentenceVector(currQA.imdb_key, currPlot)
             A = np.array([PlotVec, QuestionVec, AnsA, AnsB, AnsC, AnsD, AnsE])
@@ -54,6 +61,7 @@ def runTfIdf(trainPlots, testQuestions):
             if  score > currTotalScore:
                 currTotalScore = score
                 choice = np.argwhere(answerScores == max(answerScores))[0,0]
+                chosenPlot = currPlot
         if currTotalScore == -1.0:
             print "ERROR: Should have a total score"
             continue
@@ -61,6 +69,70 @@ def runTfIdf(trainPlots, testQuestions):
         corrChoices[currQA.correct_index] += 1
         if choice == currQA.correct_index:
             numCorrect += 1
+            # TODO: Make all this into a new print to html class
+            # and beautify it!
+            # TODO: Save into data and sort by max
+            # to min score to see patterns
+            '''
+            correctFile.write("<table>")
+            correctFile.write(' <tr><td>')
+            correctFile.write(currQA.question)
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("0) " + str(currQA.answers[0]))
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("1) " + str(currQA.answers[1]))
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("2) " + str(currQA.answers[2]))
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("3) " + str(currQA.answers[3]))
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("4) " + str(currQA.answers[4]))
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("Plot: " + str(chosenPlot))
+            correctFile.write(' </td></tr>')
+            correctFile.write(' <tr><td>')
+            correctFile.write("choice: " + str(choice) + " score: " + str(currTotalScore))
+            correctFile.write(' </td></tr>')
+            correctFile.write('</table>')
+            correctFile.write('</br>')
+            '''
+        else:
+            '''
+            # It is wrong
+            wrongFile.write("<table>")
+            wrongFile.write(' <tr><td>')
+            wrongFile.write(currQA.question)
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("0) " + str(currQA.answers[0]))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("1) " + str(currQA.answers[1]))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("2) " + str(currQA.answers[2]))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("3) " + str(currQA.answers[3]))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("4) " + str(currQA.answers[4]))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("Plot: " + str(chosenPlot))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write(' <tr><td>')
+            wrongFile.write("choice: " + str(choice) + " answer: " + str(currQA.correct_index) + " score: " + str(currTotalScore))
+            wrongFile.write(' </td></tr>')
+            wrongFile.write('</table>')
+            '''
+            wrongFile.write('</br>')
         finalAnswers[currQaNum-1] = choice
         '''
         if not (currQaNum % 1000):
@@ -84,6 +156,10 @@ def runTfIdf(trainPlots, testQuestions):
     minutes, seconds = divmod(remainder, 60)
     totalDays = elapsedTime.days
     print 'Training Time: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
+    correctFile.write("</HEAD>")
+    wrongFile.write("</HEAD>")
+    correctFile.close()
+    wrongFile.close()
     return finalAnswers
     
     
@@ -107,9 +183,11 @@ if __name__ == "__main__":
     totalDays = elapsedTime.days
     print 'Total Time Taken: Days: ' + str(totalDays) +  " hours: " + str(hours) + ' minutes: ' + str(minutes) +  ' seconds: ' + str(seconds)
 
-    print 'Answers Chosen'
+    file = open('testResults.txt', "w")
+    file.write('Answers Chosen')
     count = 0
     for val in finalAnswers:
-        print 'test:' + str(count) + ' ' + str(int(val))
+        file.write('test:' + str(count) + ' ' + str(int(val)))
         count += 1
+    file.close()
 #---------------------------------------------------------------------------------------------
