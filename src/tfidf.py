@@ -67,7 +67,7 @@ class TfIdf(object):
         word_numberOfWords |                |       |
         """
 
-        logging.info('Number of stories: ' + str(self.numberOfStories))
+        logging.info('Number of Stories: ' + str(self.numberOfStories))
         logging.info('Number of Words: ' + str(self.numberOfWords))
 
     def initTfIdfMatrix(self, tfIdfThreshold):

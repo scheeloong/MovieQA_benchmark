@@ -122,6 +122,7 @@ if __name__ == "__main__":
     logTimeInfo(startTime, endTime, "Total Time")
 
     # Write the chosen answers from the algorithm
+    # in the format that is used for submission to MovieQA leaderboard.
     file = open('testResults.txt', "w")
     file.write('Answers Chosen')
     count = 0
