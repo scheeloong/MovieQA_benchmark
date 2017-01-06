@@ -34,8 +34,6 @@ all_text_data = []
 
 
 
-
-
 #MovieQA files
 def load_files():
     """Opens all files and loads into dict"""
@@ -80,6 +78,7 @@ def word_parse(input_text):
     input_text = input_text.replace('?', '')
     input_text = input_text.replace('.', '')
 
+
     #Replace multiple spaces?
 
     word_list = input_text.split()
@@ -117,7 +116,7 @@ def vocab_to_one_hot(recognized_words):
 (parsed_movie_dict, all_text_data) = load_files()
 generate_vocabulary(parsed_movie_dict)
 
-VOCABULARY_SIZE = 50000
+VOCABULARY_SIZE = 10000
 MIN_FREQ = 5 #Minimum number of times a words must appear to be recognized
 frequent_words = vocabulary.most_common(VOCABULARY_SIZE)
 recognized_words = []
@@ -198,7 +197,6 @@ graph = tf.Graph()
 
 
 #NOTE TO SELF: FIX GENERATE BATCH FIRST!!!! (test.py)
-#TEST ON SCHOOL COMPUTER
 with graph.as_default(),tf.device('/cpu:0'):
     #Initial loss
     loss = 0
@@ -217,12 +215,11 @@ with graph.as_default(),tf.device('/cpu:0'):
 
     
     #Save model variables
-    #CHECK THIS ON SCHOOL COMPUTER!!!
     loss = tf.reduce_mean(tf.nn.sampled_softmax_loss(weights, biases, embed, train_label, num_sampled, VOCABULARY_SIZE))
     #save = tf.train.Saver()
 
     #Gradient Descent
-    optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
+    optimizer = tf.train.AdagradOptimizer(0.001).minimize(loss)
 
     #Cosine Similarity
     norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings),1, keep_dims=True))
@@ -246,6 +243,8 @@ with tf.Session(graph=graph) as session:
     start_index = 0
     total_loss = 0
 
+   
+
     for step in range(num_steps):
         batch_data, batch_labels = generate_batch(num_skips, batch_size, data, start_index)
         #print(batch_labels)
@@ -259,9 +258,9 @@ with tf.Session(graph=graph) as session:
         total_loss+=l
 
         #Estimate loss
-        if step %2000 ==0 and step !=0:
+        if step %1000 ==0 and step !=0:
             
-            loss_values.append(total_loss/2000)
+            loss_values.append(total_loss/1000)
            
             total_loss = 0
 
@@ -273,25 +272,9 @@ with tf.Session(graph=graph) as session:
 
     pylab.ylabel("Loss")
     pylab.xlabel("Step #")
-    pylab.plot(np.arange(1,100000, 2001),loss_values)
+    pylab.plot(np.arange(1,100000, 1001),loss_values)
            
     pylab.show()            
 
-
-#parsed_movies = load_files()
-#generate_vocabulary(parsed_movies)
-#recognized_words = vocabulary.most_common(vocabulary_size) #Set less common words to 0, unknown
-#print(recognized_words)
-
-#recognized_words by frequency??
-
-#Get the 1-hot indices, ordered from most to least frequent
-#for word in vocabulary:
-
-
-#print (vocabulary['the'])
-#print(vocabulary)
-#print (text['tt0256415.wiki'])
-#print(text.keys())
 
 
