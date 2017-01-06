@@ -1,4 +1,4 @@
-##word2vec implementation up to Nov 25
+
 """Based on the code from: https://github.com/ryankiros/skip-thoughts/blob/master/skipthoughts.py"""
 from __future__ import print_function
 import os
