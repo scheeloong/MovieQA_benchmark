@@ -1,4 +1,4 @@
-
+##word2vec implementation up to Nov 25
 """Based on the code from: https://github.com/ryankiros/skip-thoughts/blob/master/skipthoughts.py"""
 from __future__ import print_function
 import os
@@ -20,6 +20,7 @@ from six.moves.urllib.request import urlretrieve
 
 
 from collections import OrderedDict, defaultdict, Counter, deque
+from random import shuffle
 
 
 vocabulary = Counter() #Map of word to # instances 
@@ -32,7 +33,8 @@ hot_indices = []
 #Contains all data from all movies
 all_text_data = []
 
-
+#Holds the center word indices for examples
+ex_indices = []
 
 #MovieQA files
 def load_files():
@@ -139,18 +141,48 @@ for word in all_text_data:
     
 
 
+
+#Graph parameters
+window_size = 4
+num_skips = 8
+batch_size = 128
+embedding_dim = 128 #Embedding vector dimension
+start_index = 0
+num_sampled = 64 #Netagive examples
+
+#Select possible center words and shuffle
+dataset_word_length = len(all_text_data)
+ex_indices = list(range(window_size, dataset_word_length-window_size)) #Clip off ends to avoid going out of range
+shuffle(ex_indices) #Holds indices of center words
+
+#Split (70 training, 20 test, 10 validation)
+dataset_size = len(ex_indices)
+train_set_size = int(math.floor(dataset_size*0.7))
+test_set_size = int(math.floor(dataset_size*0.2))
+valid_set_size = dataset_size - (train_set_size+test_set_size)
+
+
+train_set = data[0: train_set_size]
+test_set = data[train_set_size: (train_set_size + test_set_size)]
+valid_set = data[(train_set_size+test_set_size):] 
+
+
+
 #NOTE TO SELF: FIX GENERATE_BATCH -----------------
 def generate_batch(num_skips, batch_size, data, start_index):
     '''Generates a training batch from the given file'''
     #Note assumes that num_skips will also be the max distance from the current word
     #Data is the one-hot index representation of the words in the vocabulary
     #num_skips is number of skips to do from each center word
-    #start index acts as offset
+    #start index is the position in ex_indices_array
+
     
     assert batch_size%num_skips == 0 #Ensure batch size is divisible by number of skips
     assert num_skips%2 ==0
     window_size = num_skips +1
 
+    '''
+    #NOTE: THIS SECTION IS FOR  iterating through dataset ***IN ORDER***
     data_len = len(data)
     num_center_words = batch_size/num_skips #number of words to skip from
 
@@ -179,24 +211,39 @@ def generate_batch(num_skips, batch_size, data, start_index):
             labels[num_skips*i +2*j] = curr_data[center_word - j-1]
             labels[num_skips*i +2*j+1] = curr_data[center_word +j +1]
     
-           
+      '''
+    num_center_words = batch_size/num_skips
+    center_word_indices = ex_indices[start_index:start_index+num_center_words]
+
+    batch = np.ndarray(shape=(batch_size), dtype=np.int32) #Holds the center words of current training batch
+    labels = np.ndarray(shape=(batch_size), dtype=np.int32) #holds the labels of the current training batch
+
+
+    
+    for i in range(num_center_words):
+        #Fill training batch/labels
+        center_word = center_word_indices[i]
+        for j in range(num_skips/2):
+            batch[num_skips*i + 2*j] = data[center_word]
+            batch[num_skips*i+2*j+1] = data[center_word]
+            
+            #Words j to the left and right of center_word
+            labels[num_skips*i+2*j] = data[center_word-j-1]
+            labels[num_skips*i + 2*j+1] = data[center_word+j+1]
+        
+
+
+    
+             
 
     return(batch,labels)
 
 
-#Graph parameters
-window_size = 2
-num_skips = 4
-batch_size = 128
-embedding_dim = 128 #Embedding vector dimension
-start_index = 0
-num_sampled = 64 #Netagive examples
+
+#---------------------TF Graph ----------------------------
 
 graph = tf.Graph()
 
-
-
-#NOTE TO SELF: FIX GENERATE BATCH FIRST!!!! (test.py)
 with graph.as_default(),tf.device('/cpu:0'):
     #Initial loss
     loss = 0
@@ -219,7 +266,7 @@ with graph.as_default(),tf.device('/cpu:0'):
     #save = tf.train.Saver()
 
     #Gradient Descent
-    optimizer = tf.train.AdagradOptimizer(0.001).minimize(loss)
+    optimizer = tf.train.AdagradOptimizer(0.01).minimize(loss)
 
     #Cosine Similarity
     norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings),1, keep_dims=True))
@@ -240,12 +287,13 @@ with tf.Session(graph=graph) as session:
     print('Variables initialized')
 
     num_steps = 100001
-    start_index = 0
+    start_index =0 #iterate through the ex_indices
     total_loss = 0
 
    
 
     for step in range(num_steps):
+        
         batch_data, batch_labels = generate_batch(num_skips, batch_size, data, start_index)
         #print(batch_labels)
         batch_labels = np.reshape(batch_labels,(128,1))
