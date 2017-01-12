@@ -1,4 +1,4 @@
-##word2vec implementation up to Nov 25
+##word2vec implementation up to Jan 12
 """Based on the code from: https://github.com/ryankiros/skip-thoughts/blob/master/skipthoughts.py"""
 from __future__ import print_function
 import os
@@ -213,7 +213,18 @@ def generate_batch(num_skips, batch_size, data, start_index):
     
       '''
     num_center_words = batch_size/num_skips
-    center_word_indices = ex_indices[start_index:start_index+num_center_words]
+
+    if (start_index + num_center_words)<=len(ex_indices):
+        #All required data in bounds of ex_indices
+        center_word_indices = ex_indices[start_index:start_index+num_center_words]
+    else:
+        #loop around to beginning of ex_indices
+        extra_words = (start_index + num_center_words) - len(ex_indices)
+        center_word_indices = ex_indices[start_index:]
+        center_word_indices.extend(ex_indices[:extra_words])
+        
+   
+    #center_word_indices = ex_indices[start_index:start_index+num_center_words]
 
     batch = np.ndarray(shape=(batch_size), dtype=np.int32) #Holds the center words of current training batch
     labels = np.ndarray(shape=(batch_size), dtype=np.int32) #holds the labels of the current training batch
@@ -318,8 +329,12 @@ with tf.Session(graph=graph) as session:
     embeddings = normalized_embeddings.eval()
     print("Completed")
 
+
     pylab.ylabel("Loss")
     pylab.xlabel("Step #")
+    loss_value_array = np.array(loss_values)
+    print("SHAPES! loss, other")
+    print(loss_value_array.shape)
     pylab.plot(np.arange(1,100000, 1001),loss_values)
            
     pylab.show()            
