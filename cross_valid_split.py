@@ -56,17 +56,3 @@ def cross_valid_split(dataset, total_num_folds, curr_fold_num, split_ratios, cli
 
     return (train_set, test_set, valid_set)
 
-
-dataset = [0,1,2,3,4,5,6,7,8,9]
-total_num_folds=2
-split_ratios = [0.7,0.2,0.1]
-for curr_fold_num in range(total_num_folds):
-    train,test,valid=cross_valid_split(dataset, total_num_folds, curr_fold_num, split_ratios, clip_size=1)
-    print('-------Current fold number: %d-------' %curr_fold_num)
-    print('training set:')
-    print(train)
-    print('test set:')
-    print(test)
-    print('validation set:')
-    print(valid)
-
