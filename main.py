@@ -1,7 +1,6 @@
 import MovieQA
 from src.tfidf import TfIdf
-from src.htmloutput import HtmlOutput
-
+from src.htmloutput import HtmlOutput 
 import datetime
 import logging
 import math

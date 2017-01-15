@@ -16,8 +16,20 @@ class HtmlOutput(object):
         self.htmlFile.write(currQA.question)
         self.htmlFile.write(' </td></tr>')
         answerChoice = 0
-        for answer in currQA.answers:
-            self.htmlFile.write(' <tr><td>')
+        for currChoice, answer in enumerate(currQA.answers):
+            if currChoice == currQA.correct_index:
+                # If the answer was correct, color GREEN
+                if choice == currQA.correct_index:
+                    self.htmlFile.write(' <tr bgcolor="#66FF33"><td>')
+                # Answer was wrong, color RED
+                else:
+                    self.htmlFile.write(' <tr bgcolor="#FF0000"><td>')
+            elif currChoice == choice:
+                # This was the chosen answer that was incorrect, color BLUE
+                self.htmlFile.write(' <tr bgcolor="#00FFFF"><td>')
+            # It's a normal choice that wasn't picked or an ansewr
+            else:
+                self.htmlFile.write(' <tr><td>')
             self.htmlFile.write(str(answerChoice) + ") " + str(answer))
             self.htmlFile.write(' </td></tr>')
             answerChoice += 1
@@ -25,7 +37,7 @@ class HtmlOutput(object):
         self.htmlFile.write("Plot: " + str(chosenPlot))
         self.htmlFile.write(' </td></tr>')
         self.htmlFile.write(' <tr><td>')
-        self.htmlFile.write("choice: " + str(choice) + " answer: " + str(currQA.correct_index) + " score: " + str(currTotalScore))
+        self.htmlFile.write("score: " + str(currTotalScore))
         self.htmlFile.write(' </td></tr>')
         self.htmlFile.write('</table>')
         self.htmlFile.write('</br>')
