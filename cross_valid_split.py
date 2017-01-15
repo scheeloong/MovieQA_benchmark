@@ -25,35 +25,48 @@ def cross_valid_split(dataset, total_num_folds, curr_fold_num, split_ratios, cli
     train_set_start_index = fold_offset*curr_fold_num
     test_set_start_index = (train_set_start_index + train_set_size)%dataset_size
     valid_set_start_index = (test_set_start_index + test_set_size)%dataset_size
-    valid_set_stop_index = (valid_set_start_index + valid_set_size +1)%dataset_size
+    #valid_set_stop_index = (valid_set_start_index + valid_set_size +1)%dataset_size
 
     #TODO: consider using np arrays instead
     if test_set_start_index<train_set_start_index:
         #train set loops around
         train_set = usable_dataset[train_set_start_index:] + usable_dataset[:test_set_start_index]
         test_set = usable_dataset[test_set_start_index:valid_set_start_index]
-        valid_set = usable_dataset[valid_set_start_index:valid_set_stop_index]
-
+        valid_set = usable_dataset[valid_set_start_index:train_set_start_index]
+        print('loop1')
     elif valid_set_start_index<test_set_start_index:
         #test set loops around
         train_set = usable_dataset[train_set_start_index:test_set_start_index]
         test_set = usable_dataset[test_set_start_index:] + usable_dataset[:valid_set_start_index]
-        valid_set = usable_dataset[valid_set_start_index:valid_set_stop_index]
-
+        valid_set = usable_dataset[valid_set_start_index:train_set_start_index]
+        print('loop2')
     elif train_set_start_index<valid_set_start_index:
         #validation set loops around
         train_set = usable_dataset[train_set_start_index:test_set_start_index]
         test_set = usable_dataset[test_set_start_index:valid_set_start_index]
-        valid_set = usable_dataset[valid_set_start_index:] + usable_dataset[:valid_set_stop_index]
-
+        valid_set = usable_dataset[valid_set_start_index:] + usable_dataset[:train_set_start_index]
+        print('loop3')
     else:
         #No looping
         train_set = usable_dataset[train_set_start_index:test_set_start_index]
         test_set = usable_dataset[test_set_start_index:valid_set_start_index]
-        valid_set = usable_dataset[valid_set_start_index:valid_set_stop_index]
-   
-    random.shuffle(train_set)
+        valid_set = usable_dataset[valid_set_start_index:]
+        print('loop4')   
+    #random.shuffle(train_set)
 
     return (train_set, test_set, valid_set)
 
+
+dataset = [0,1,2,3,4,5,6,7,8,9]
+total_num_folds=2
+split_ratios = [0.7,0.2,0.1]
+for curr_fold_num in range(total_num_folds):
+    train,test,valid=cross_valid_split(dataset, total_num_folds, curr_fold_num, split_ratios, clip_size=1)
+    print('-------Current fold number: %d-------' %curr_fold_num)
+    print('training set:')
+    print(train)
+    print('test set:')
+    print(test)
+    print('validation set:')
+    print(valid)
 
