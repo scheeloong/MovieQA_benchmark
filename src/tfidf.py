@@ -113,3 +113,15 @@ class TfIdf(object):
             if self.tfIdfMatrix.contains(currWord, movieKey):
                 sentenceVec[self.tfIdfMatrix.getWordIndex(currWord)] = self.tfIdfMatrix.getScore(currWord, movieKey)
         return sentenceVec
+
+    def getWordScoreArray(self, movieKey, sentence):
+        ''' sentence is a string.
+        '''
+        cleanSentence = self.tokenizer.tokenizeOrderedAlphanumericLower(sentence)
+        sentenceVec = np.zeros((len(cleanSentence),1))
+        for i, currWord in enumerate(cleanSentence):
+            if self.tfIdfMatrix.contains(currWord, movieKey):
+                sentenceVec[i] = self.tfIdfMatrix.getScore(currWord, movieKey)
+
+        return sentenceVec
+        
