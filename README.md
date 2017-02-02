@@ -12,6 +12,7 @@
   run nltk.download() in python interpreter and download wordnet under the corpora tab. 
 
 #### Plots Data
+  Manually get the script movieqa_get_stories.sh from movieqa.cs.toronto.edu by signing an agreement. 
   cd MovieQA
   bash movieqa_get_stories.sh true
 
