@@ -35,9 +35,9 @@ if __name__=="__main__":
         #Initial loss
         loss =0
         
-        story_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE])
+        story_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE, None])
         question_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE])
-        answer_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE])
+        answer_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE]) #1hot vector of answer
 
         #word encodings
         A_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
@@ -50,7 +50,8 @@ if __name__=="__main__":
 
         #Prediction weight matrix
         W_weights = tf.Variable(tf.truncated_normal([embed_dim, VOCABUALRY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
-        
+        W_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
+
         #Initialize random embeddings
         embeddings_A = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
         embeddings_B = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
@@ -63,12 +64,15 @@ if __name__=="__main__":
 
 
 	#TODO: (Emily) FIX THIS      
-	control_signal_u = tf.matmul(tf.rehsape(question_data, [1, VOCABULARY_SIZE]), B_weights)
-        memory_selection tf.transpose(control_signal_u)
+	    memory_matrix_m = tf.matmul(story-data, word_encoder_A)
+        control_signal_u = tf.matmul(tf.reshape(question_data, [1, VOCABULARY_SIZE]), word_encoder_B)
+        c_set = tf.reshape(story_data, [1, VOCABULARY_SIZE]), word_encoder_C)
+
+        memory_selection = tf.matmul(tf.transpose(control_signal_u),memory_matrix_m)
         p = tf.nn.softmax(memory_selection)
-        c_set = tf.reshape(story_data, [1, VOCABULARY_SIZE]), C_weights)
-        o = tf.reduce_sum(tf.matmul(p, c_set)
-        predicted_answer = tf.nn.softmax(tf.matmul(W, tf.sum(o,u))
+        
+        o = tf.reduce_sum(tf.matmul(p, c_set))
+        predicted_answer = tf.nn.softmax(tf.matmul(W, tf.sum(o,u)))
         #END FIX THIS
         
         #Squared error between predicted and actual answer
@@ -77,6 +81,8 @@ if __name__=="__main__":
         #Optimzier
         #TODO: Try using stochastic gradient descent instead
         optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
+
+
 
         loss_values = []
         
@@ -130,5 +136,4 @@ if __name__=="__main__":
         pylab.plot(np.arange(1,100000, 1001),loss_values)
            
         pylab.show()  
-
 
