@@ -21,3 +21,14 @@
   - correctFile.html 
   - wrongFile.html
   - testResults.txt
+
+#### bABi dataset
+sudo apt install luarocks
+sudo luarocks --from=https://raw.githubusercontent.com/torch/rocks/master/ install class
+sudo luarocks --from=https://raw.githubusercontent.com/torch/rocks/master/ install torch
+sudo luarocks make babitasks-scm-1.rockspec 
+
+# 15, 16, 17 should work, others do not work for now
+babitasks 17 1
+# Generate 1000 training data for each of 20 tasks
+for i in `seq 1 20`; do babi-tasks $i 1000 > task_$i.txt; done
