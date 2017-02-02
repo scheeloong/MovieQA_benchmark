@@ -49,7 +49,7 @@ if __name__=="__main__":
         C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
 
         #Prediction weight matrix
-        W_weights = tf.Variable(tf.truncated_normal([embed_dim, VOCABUALRY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
+        W_weights = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
         W_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
 
         #Initialize random embeddings
@@ -62,18 +62,18 @@ if __name__=="__main__":
         word_encoder_B = tf.nn.embedding_lookup(embeddings_B, question_data)
         word_encoder_C = tf.nn.embedding_lookup(embeddings_C, story_data)
 
-
-	#TODO: (Emily) FIX THIS      
-	    memory_matrix_m = tf.matmul(story-data, word_encoder_A)
+  
+	    memory_matrix_m = tf.matmul(story_data, word_encoder_A)
         control_signal_u = tf.matmul(tf.reshape(question_data, [1, VOCABULARY_SIZE]), word_encoder_B)
         c_set = tf.reshape(story_data, [1, VOCABULARY_SIZE]), word_encoder_C)
 
         memory_selection = tf.matmul(tf.transpose(control_signal_u),memory_matrix_m)
         p = tf.nn.softmax(memory_selection)
         
+        
         o = tf.reduce_sum(tf.matmul(p, c_set))
+
         predicted_answer = tf.nn.softmax(tf.matmul(W, tf.sum(o,u)))
-        #END FIX THIS
         
         #Squared error between predicted and actual answer
         loss += tf.nn.softmax_cross_entropy_with_logits(predicted_answer, answer_data)
