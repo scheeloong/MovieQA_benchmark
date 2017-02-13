@@ -21,15 +21,24 @@ from random import shuffle
 
 class BabiParser(object):
     def __init__(self):
-        self.fileNames = ["qa1_single-supporting-fact_train.txt"]
+        #self.fileNames = ["qa1_single-supporting-fact_train.txt"]
+        self.fileNames = ["temp.txt"]
         self.vocabularyToIndex = {}
         self.numWords = 0
         self.numStory = 0
+        self.maxSentencePerStory = 0
+        self.numQuestion = 0
         # Parse the vocabulary
         self.parseBabiTaskVocabulary()
-        # Parse the vectors
-        self.parseBabiTaskVectors()
-
+        print self.numStory
+        print self.numWords
+        print self.maxSentencePerStory
+        # Parse the vectors to get X and q
+        self.X, self.q = self.parseBabiTaskVectors()
+        '''
+        print self.q.shape
+        print self.q
+        '''
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
             return
@@ -56,10 +65,17 @@ class BabiParser(object):
         uniqueIndex = 0
         vocabulary = []
         for currFile in self.fileNames:
+            numSentencePerStory = 0 
             fd = open("en/" + currFile, "r")
             for currLine in fd.readlines():
+                Id = currLine[0]
+                # Start of a new story
+                if Id == "1":
+                    self.numStory += 1
+                    numSentencePerStory = 0
                 # A question
                 if '\t' in currLine:
+                    self.numQuestion += 1
                     # Need to close the current X
                     lineSplit = re.split(r'\t+', currLine)
                     # Don't include the index
@@ -72,6 +88,8 @@ class BabiParser(object):
                         self.insertVocabulary(currWord)
                 # A Sentence
                 else:
+                    numSentencePerStory += 1
+                    self.maxSentencePerStory = max(self.maxSentencePerStory, numSentencePerStory)
                     sentence = currLine.split(' ', 1)[1].strip()
                     sentence = sentence.translate(None, string.punctuation)
                     for currWord in sentence.split(' '):
@@ -83,8 +101,19 @@ class BabiParser(object):
         """
         Create the matrices:
         X = (numVocab, numSentence, numQuestion)
-        q = (numVocab, numQuestion)
+        q = (numQuestion, self.numWord)
+        # X = np.zeros((self.numWords, self.maxSentencePerStory, self.numQuestion))
+        # q = np.zeros((self.numWords, self.numQuestion))
         """
+        X = np.zeros((self.numQuestion, self.maxSentencePerStory, self.numWords))
+        q = np.zeros((self.numQuestion, self.numWords))
+        print X.shape
+        print q.shape
+
+        currX = np.zeros((self.numWords, self.maxSentencePerStory))
+        numQ = 0
+        numX = 0
+
         # Create the matrix
         for currFile in self.fileNames:
             fd = open("en/" + currFile, "r")
@@ -92,25 +121,32 @@ class BabiParser(object):
                 Id = currLine[0]
                 # Start of a new story
                 if Id == "1":
+                    # Create a new currX
+                    currX = np.zeros((self.numWords, self.maxSentencePerStory))
                     self.numStory += 1
-                else: 
-                    # A question
-                    if '\t' in currLine:
-                        # Need to close the current X
-                        lineSplit = re.split(r'\t+', currLine)
-                        # Don't include the index
-                        question = lineSplit[0].split(' ', 1)[1].strip()
-                        question = question.translate(None, string.punctuation)
-                        answer = lineSplit[1].strip()
+                # A question
+                if '\t' in currLine:
+                    # Need to close the current X
+                    lineSplit = re.split(r'\t+', currLine)
+                    # Don't include the index
+                    question = lineSplit[0].split(' ', 1)[1].strip()
+                    question = question.translate(None, string.punctuation)
+                    answer = lineSplit[1].strip()
 
-                        questionVec = self.getSentenceVector(question)
-                        answerVec = self.getSentenceVector(answer)
-                    # A Sentence
-                    else:
-                        sentence = currLine.split(' ', 1)[1].strip()
-                        sentence = sentence.translate(None, string.punctuation)
-                        sentenceVec = self.getSentenceVector(sentence)
-        return
+                    questionVec = self.getSentenceVector(question)
+                    # TODO: What to do with answerVec
+                    answerVec = self.getSentenceVector(answer)
+
+                    # Append current X into X
+                    # Append q into currentQ
+                    q[numQ] = questionVec
+                    numQ += 1
+                # A Sentence
+                else:
+                    sentence = currLine.split(' ', 1)[1].strip()
+                    sentence = sentence.translate(None, string.punctuation)
+                    sentenceVec = self.getSentenceVector(sentence)
+        return X, q
 
 if __name__=="__main__":
     B = BabiParser()
