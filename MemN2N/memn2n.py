@@ -8,6 +8,10 @@ import random
 
 import tensorflow as tf
 import numpy as np
+import sys
+
+import re # Split by tabs
+import string # To remove punctuation
 
 from matplotlib import pylab
 #from sklearn.manifold import TSNE
@@ -15,11 +19,105 @@ from matplotlib import pylab
 from collections import OrderedDict, defaultdict, Counter, deque
 from random import shuffle
 
+class BabiParser(object):
+    def __init__(self):
+        self.fileNames = ["qa1_single-supporting-fact_train.txt"]
+        self.vocabularyToIndex = {}
+        self.numWords = 0
+        self.numStory = 0
+        # Parse the vocabulary
+        self.parseBabiTaskVocabulary()
+        # Parse the vectors
+        self.parseBabiTaskVectors()
+
+    def insertVocabulary(self, word):
+        if word in self.vocabularyToIndex:
+            return
+        self.vocabularyToIndex[word] = self.numWords
+        self.numWords += 1
+        return
+
+    def getSentenceVector(self, sentence):
+        rowVector = list()
+        for word in sentence.split():
+            rowVector.append(self.vocabularyToIndex[word])
+        sentenceVec = self.convertToOneHot(np.array(rowVector))
+        return sentenceVec
+
+    def convertToOneHot(self, rowVector):
+        oneHotVectors = np.eye(self.numWords)[rowVector]
+        return np.sum(oneHotVectors, 0)
+
+    def parseBabiTaskVocabulary(self):
+        """
+        First loop is to assign each word into vocabulary
+        Second loop is to create the matrix
+        """
+        uniqueIndex = 0
+        vocabulary = []
+        for currFile in self.fileNames:
+            fd = open("en/" + currFile, "r")
+            for currLine in fd.readlines():
+                # A question
+                if '\t' in currLine:
+                    # Need to close the current X
+                    lineSplit = re.split(r'\t+', currLine)
+                    # Don't include the index
+                    question = lineSplit[0].split(' ', 1)[1].strip()
+                    question = question.translate(None, string.punctuation)
+                    answer = lineSplit[1].strip()
+                    for currWord in question.split(' '):
+                        self.insertVocabulary(currWord)
+                    for currWord in answer.split(' '):
+                        self.insertVocabulary(currWord)
+                # A Sentence
+                else:
+                    sentence = currLine.split(' ', 1)[1].strip()
+                    sentence = sentence.translate(None, string.punctuation)
+                    for currWord in sentence.split(' '):
+                        self.insertVocabulary(currWord)
+        # Done inserting all word
+        print self.numWords
+
+    def parseBabiTaskVectors(self):
+        """
+        Create the matrices:
+        X = (numVocab, numSentence, numQuestion)
+        q = (numVocab, numQuestion)
+        """
+        # Create the matrix
+        for currFile in self.fileNames:
+            fd = open("en/" + currFile, "r")
+            for currLine in fd.readlines():
+                Id = currLine[0]
+                # Start of a new story
+                if Id == "1":
+                    self.numStory += 1
+                else: 
+                    # A question
+                    if '\t' in currLine:
+                        # Need to close the current X
+                        lineSplit = re.split(r'\t+', currLine)
+                        # Don't include the index
+                        question = lineSplit[0].split(' ', 1)[1].strip()
+                        question = question.translate(None, string.punctuation)
+                        answer = lineSplit[1].strip()
+
+                        questionVec = self.getSentenceVector(question)
+                        answerVec = self.getSentenceVector(answer)
+                    # A Sentence
+                    else:
+                        sentence = currLine.split(' ', 1)[1].strip()
+                        sentence = sentence.translate(None, string.punctuation)
+                        sentenceVec = self.getSentenceVector(sentence)
+        return
+
 if __name__=="__main__":
+    B = BabiParser()
+    sys.exit(0)
+    """
     VOCABULARY_SIZE = 50000 #Number of recognized words; V in paper
     MIN_WORD_FREQEUNCY = 5
-
-    
 
     #TODO: BATCH/CLEANING
 
@@ -27,13 +125,13 @@ if __name__=="__main__":
     embed_dim = 128 #Embedding vector dimension; d in paper
     batch_size = 128
 
-
     #Create tensorflow graph
     graph = tf.Graph()
 
+    # Run using CPU 
     with graph.as_default(), tf.device('/cpu:0'):
         #Initial loss
-        loss =0
+        loss = 0.0
         
         story_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE, None])
         question_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE])
@@ -61,18 +159,13 @@ if __name__=="__main__":
         word_encoder_A = tf.nn.embedding_lookup(embeddings_A, story_data)
         word_encoder_B = tf.nn.embedding_lookup(embeddings_B, question_data)
         word_encoder_C = tf.nn.embedding_lookup(embeddings_C, story_data)
-
-  
-	    memory_matrix_m = tf.matmul(story_data, word_encoder_A)
+        memory_matrix_m = tf.matmul(story_data, word_encoder_A)
         control_signal_u = tf.matmul(tf.reshape(question_data, [1, VOCABULARY_SIZE]), word_encoder_B)
         c_set = tf.reshape(story_data, [1, VOCABULARY_SIZE]), word_encoder_C)
 
         memory_selection = tf.matmul(tf.transpose(control_signal_u),memory_matrix_m)
         p = tf.nn.softmax(memory_selection)
-        
-        
         o = tf.reduce_sum(tf.matmul(p, c_set))
-
         predicted_answer = tf.nn.softmax(tf.matmul(W, tf.sum(o,u)))
         
         #Squared error between predicted and actual answer
@@ -82,39 +175,28 @@ if __name__=="__main__":
         #TODO: Try using stochastic gradient descent instead
         optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
 
-
-
+        # Fo rplotting loss
         loss_values = []
-        
         #Train the model
         with tf.Session(graph=graph) as session:
             #Initialize variables
             tf.initialize_all_variables().run()
             print('Variables initialized')
-
-
             #Restore checkpoint
             if os.path.isfile("memn2n.ckpt"):
                 print("Resuming from checkpoint")
                 saver.restore(session, "memn2n.ckpt")
-
-
             num_steps = 100001
             epoch_size = 1000
             total_epoch_loss =0 
-
             for step in range(num_steps):
                 #TODO Call batch generator and replace train_story, train_qu, train_answer
                 train_story = np.zeros([VOCABULARY_SIZE,50])
                 train_qu = np.zeros([VOCABULARY_SIZE])
                 train_answer = np.zeros([VOCABULARY_SIZE])
-
-                
                 feed_dict = {story_data: train_story, question_data: train qu, answer_data: train_answer}
                 _,l = session.run([optimizer, loss], feed_dict = feed_dict)
                 total_loss +=l
-          
-                
                 if step%50000==0 and step!=0:
                     #Create checkpoint
                     print(t_data)
@@ -125,15 +207,12 @@ if __name__=="__main__":
                     #Store loss values for the epoch
                     loss_values.append(total_loss/epoch_size)
                     total_loss =0
-
             embeddings = 
             print("Training done!")
-
         #Print loss plot
         pylab.ylabel("Loss")
         pylab.xlabel("Step #")
         loss_value_array = np.array(loss_values)
         pylab.plot(np.arange(1,100000, 1001),loss_values)
-           
         pylab.show()  
-
+    """
