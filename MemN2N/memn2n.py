@@ -30,17 +30,20 @@ class BabiParser(object):
         self.numQuestion = 0
         # Parse the vocabulary
         self.parseBabiTaskVocabulary()
-        # Parse the vectors to get X and q
-        self.X, self.q = self.parseBabiTaskVectors()
+        # Parse the vectors to get X, q, a (input, question, answer) sentence vectors
+        self.X, self.q, self.a = self.parseBabiTaskVectors()
         print 'numWords:', self.numWords
         print 'numStory:', self.numStory
         print 'maxSentencePerStory:', self.maxSentencePerStory
         print 'numQuestion:', self.numQuestion
-        print self.X.shape
+        print 'Input Shape:', self.X.shape
+        print 'Question Shape:', self.q.shape
+        print 'Answer Shape:', self.a.shape
+        '''
         print self.X
-        print self.q.shape
         print self.q
-
+        print self.a 
+        '''
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
             return
@@ -109,8 +112,7 @@ class BabiParser(object):
         """
         X = np.zeros((self.numQuestion, self.maxSentencePerStory, self.numWords))
         q = np.zeros((self.numQuestion, self.numWords))
-        print X.shape
-        print q.shape
+        a = np.zeros((self.numQuestion, self.numWords))
 
         currX = np.zeros((self.numWords, self.maxSentencePerStory))
         numQ = 0
@@ -145,6 +147,7 @@ class BabiParser(object):
 
                     # Append q into currentQ
                     q[numQ] = questionVec
+                    a[numQ] = answerVec
                     numQ += 1
                 # A Sentence
                 else:
@@ -153,7 +156,7 @@ class BabiParser(object):
                     sentenceVec = self.getSentenceVector(sentence)
                     currX[numXStory] = sentenceVec
                     numXStory += 1
-        return X, q
+        return X, q, a
 
 if __name__=="__main__":
     B = BabiParser()
