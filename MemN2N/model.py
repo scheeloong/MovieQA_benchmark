@@ -45,9 +45,9 @@ if __name__=="__main__":
         B_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
         C_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
         
-        A_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
-        B_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
-        C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
+        #A_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
+        #B_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
+        #C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
 
         #Prediction weight matrix
         W_weights = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
@@ -59,15 +59,10 @@ if __name__=="__main__":
         embeddings_C = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
 
         #Hidden layers for word encodings
-        word_encoder_A = tf.nn.embedding_lookup(embeddings_A, story_data)
-        word_encoder_B = tf.nn.embedding_lookup(embeddings_B, question_data)
-        word_encoder_C = tf.nn.embedding_lookup(embeddings_C, story_data)
+        memory_matrix_m = tf.nn.embedding_lookup(embeddings_A, story_data)
+        control_signal_u = tf.nn.embedding_lookup(embeddings_B, question_data)
+        c_set= tf.nn.embedding_lookup(embeddings_C, story_data)
         pdb.set_trace()
-
-  
-	memory_matrix_m = tf.matmul(tf.cast(story_data, tf.float32), word_encoder_A)
-        control_signal_u = tf.matmul(tf.reshape(question_data, [1, VOCABULARY_SIZE]), word_encoder_B)
-        c_set = tf.matmul(tf.reshape(story_data, [1, VOCABULARY_SIZE]), word_encoder_C)
 
         memory_selection = tf.matmul(memory_matrix_m, tf.transpose(control_signal_u))
         p = tf.nn.softmax(memory_selection)
