@@ -21,8 +21,8 @@ from random import shuffle
 
 class BabiParser(object):
     def __init__(self):
-        #self.fileNames = ["qa1_single-supporting-fact_train.txt"]
-        self.fileNames = ["temp.txt"]
+        self.fileNames = ["qa1_single-supporting-fact_train.txt"]
+        #self.fileNames = ["temp.txt"]
         self.vocabularyToIndex = {}
         self.numWords = 0
         self.numStory = 0
@@ -30,15 +30,17 @@ class BabiParser(object):
         self.numQuestion = 0
         # Parse the vocabulary
         self.parseBabiTaskVocabulary()
-        print self.numStory
-        print self.numWords
-        print self.maxSentencePerStory
         # Parse the vectors to get X and q
         self.X, self.q = self.parseBabiTaskVectors()
-        '''
+        print 'numWords:', self.numWords
+        print 'numStory:', self.numStory
+        print 'maxSentencePerStory:', self.maxSentencePerStory
+        print 'numQuestion:', self.numQuestion
+        print self.X.shape
+        print self.X
         print self.q.shape
         print self.q
-        '''
+
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
             return
@@ -68,7 +70,7 @@ class BabiParser(object):
             numSentencePerStory = 0 
             fd = open("en/" + currFile, "r")
             for currLine in fd.readlines():
-                Id = currLine[0]
+                Id = currLine.split(' ')[0]
                 # Start of a new story
                 if Id == "1":
                     self.numStory += 1
@@ -112,18 +114,19 @@ class BabiParser(object):
 
         currX = np.zeros((self.numWords, self.maxSentencePerStory))
         numQ = 0
-        numX = 0
 
         # Create the matrix
         for currFile in self.fileNames:
             fd = open("en/" + currFile, "r")
             for currLine in fd.readlines():
-                Id = currLine[0]
+                Id = currLine.split(' ')[0]
                 # Start of a new story
                 if Id == "1":
                     # Create a new currX
-                    currX = np.zeros((self.numWords, self.maxSentencePerStory))
-                    self.numStory += 1
+                    currX = np.zeros((self.maxSentencePerStory, self.numWords))
+                    # Initialize the story to be at the 0th position
+                    numXStory = 0
+
                 # A question
                 if '\t' in currLine:
                     # Need to close the current X
@@ -138,6 +141,8 @@ class BabiParser(object):
                     answerVec = self.getSentenceVector(answer)
 
                     # Append current X into X
+                    X[numQ] = currX
+
                     # Append q into currentQ
                     q[numQ] = questionVec
                     numQ += 1
@@ -146,6 +151,8 @@ class BabiParser(object):
                     sentence = currLine.split(' ', 1)[1].strip()
                     sentence = sentence.translate(None, string.punctuation)
                     sentenceVec = self.getSentenceVector(sentence)
+                    currX[numXStory] = sentenceVec
+                    numXStory += 1
         return X, q
 
 if __name__=="__main__":
