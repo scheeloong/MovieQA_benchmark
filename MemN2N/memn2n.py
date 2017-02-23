@@ -171,7 +171,7 @@ if __name__=="__main__":
 
     X, q, a, max_num_sentences, VOCABULARY_SIZE, num_steps = B.getBabiTask()
 
-    epoch_size = 2
+    epoch_size = 10
     print 'epoch size is', epoch_size
     
 
@@ -273,8 +273,8 @@ if __name__=="__main__":
 
                     _,l = session.run([optimizer, loss], feed_dict = feed_dict)
 
-                    total_loss +=l
                     
+                    loss_values.append(l)
                     '''
                     if step % 50000==0 and step!=0:
                         #Create checkpoint
@@ -284,9 +284,7 @@ if __name__=="__main__":
                             checkpoint = saver.save(session, "memn2n.ckpt")
                     '''
                 #Store loss values for the epoch
-                loss_values.append(total_loss/num_steps)
                 total_loss = 0.0
-
              
             print("Training done!")
 
@@ -294,7 +292,7 @@ if __name__=="__main__":
         pylab.ylabel("Loss")
         pylab.xlabel("Step #")
         loss_value_array = np.array(loss_values)
-        pylab.plot(np.arange(0,epoch_size, 1),loss_values)
+        pylab.plot(np.arange(0,epoch_size*num_steps, 1),loss_values)
            
         pylab.show()  
 
