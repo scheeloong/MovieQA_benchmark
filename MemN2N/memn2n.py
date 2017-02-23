@@ -13,8 +13,7 @@ import sys
 import re # Split by tabs
 import string # To remove punctuation
 
-from matplotlib import pylab
-#from sklearn.manifold import TSNE
+from matplotlib import pylab #from sklearn.manifold import TSNE
 
 from collections import OrderedDict, defaultdict, Counter, deque
 from random import shuffle
@@ -44,6 +43,9 @@ class BabiParser(object):
         print self.q
         print self.a 
         '''
+    def getBabiTask(self):
+        return self.X, self.q, self.a, self.maxSentencePerStory, self.numWords, self.numQuestion
+
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
             return
@@ -160,105 +162,140 @@ class BabiParser(object):
 
 if __name__=="__main__":
     B = BabiParser()
-    sys.exit(0)
-    """
-    VOCABULARY_SIZE = 50000 #Number of recognized words; V in paper
+
+    VOCABULARY_SIZE = 19 #Number of recognized words; V in paper
     MIN_WORD_FREQEUNCY = 5
+    #TODO change max number of sentences
+    max_num_sentences = 10 
+    max_sentence_length = 30
+
+    X, q, a, max_num_sentences, VOCABULARY_SIZE, num_steps = B.getBabiTask()
+
+    epoch_size = 2
+    print 'epoch size is', epoch_size
+    
 
     #TODO: BATCH/CLEANING
 
     #Graph parameters
-    embed_dim = 128 #Embedding vector dimension; d in paper
+    embed_dim = 80 #Embedding vector dimension; d in paper
     batch_size = 128
+    total_loss = 0.0
 
     #Create tensorflow graph
     graph = tf.Graph()
 
-    # Run using CPU 
     with graph.as_default(), tf.device('/cpu:0'):
         #Initial loss
-        loss = 0.0
+        loss =0
         
-        story_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE, None])
-        question_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE])
-        answer_data = tf.placeholder(tf.int32, shape=[VOCABULARY_SIZE]) #1hot vector of answer
+        story_data = tf.placeholder(tf.int32, shape=[max_num_sentences, VOCABULARY_SIZE], name="storydata")
+        question_data = tf.placeholder(tf.int32, shape=[1,VOCABULARY_SIZE], name="questiondata")
+        answer_data = tf.placeholder(tf.int32, shape=[1,VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
 
         #word encodings
-        A_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
-        B_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
-        C_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
+        #A_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
+        #B_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
+        #C_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
         
-        A_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
-        B_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
-        C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
+        #A_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
+        #B_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
+        #C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
 
         #Prediction weight matrix
-        W_weights = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
-        W_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE]))
+        W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
+        #W_biases = tf.Variable(tf.zeros([embed_dim]))
 
         #Initialize random embeddings
         embeddings_A = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
         embeddings_B = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
         embeddings_C = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
 
-        #Hidden layers for word encodings
-        word_encoder_A = tf.nn.embedding_lookup(embeddings_A, story_data)
-        word_encoder_B = tf.nn.embedding_lookup(embeddings_B, question_data)
-        word_encoder_C = tf.nn.embedding_lookup(embeddings_C, story_data)
-        memory_matrix_m = tf.matmul(story_data, word_encoder_A)
-        control_signal_u = tf.matmul(tf.reshape(question_data, [1, VOCABULARY_SIZE]), word_encoder_B)
-        c_set = tf.reshape(story_data, [1, VOCABULARY_SIZE]), word_encoder_C)
-
-        memory_selection = tf.matmul(tf.transpose(control_signal_u),memory_matrix_m)
+        #Hidden layers for word encodings (sum words to get sentence representation)
+        memory_matrix_m = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_A, story_data),1)
+        control_signal_u = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_B, question_data),1)
+        c_set= tf.reduce_sum(tf.nn.embedding_lookup(embeddings_C, story_data),1)
+        
+        memory_selection = tf.matmul(memory_matrix_m, tf.transpose(control_signal_u))
         p = tf.nn.softmax(memory_selection)
-        o = tf.reduce_sum(tf.matmul(p, c_set))
-        predicted_answer = tf.nn.softmax(tf.matmul(W, tf.sum(o,u)))
+        #pdb.set_trace()
+        #NOTE: For newer versions of tensorflow, change tf.mul to tf.multiply
+        o = tf.reduce_sum(tf.mul(c_set, p),0)
+
+        #Note: For newer versions of tensorflow, change tf.add to tf.sum
+
+        o_u_sum = tf.add(tf.reshape(o, [1,embed_dim]),control_signal_u)
+        predicted_answer_labels = tf.nn.softmax(tf.matmul(o_u_sum,W))
         
         #Squared error between predicted and actual answer
-        loss += tf.nn.softmax_cross_entropy_with_logits(predicted_answer, answer_data)
+        #pdb.set_trace()
+        #TODO: Verify that labels should be col vec. and not row vec.
+        loss += tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,VOCABULARY_SIZE]))
         
         #Optimzier
         #TODO: Try using stochastic gradient descent instead
         optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
 
-        # Fo rplotting loss
+
+
         loss_values = []
+        
         #Train the model
         with tf.Session(graph=graph) as session:
             #Initialize variables
             tf.initialize_all_variables().run()
             print('Variables initialized')
+
+
             #Restore checkpoint
             if os.path.isfile("memn2n.ckpt"):
                 print("Resuming from checkpoint")
                 saver.restore(session, "memn2n.ckpt")
-            num_steps = 100001
-            epoch_size = 1000
+
+
             total_epoch_loss =0 
-            for step in range(num_steps):
-                #TODO Call batch generator and replace train_story, train_qu, train_answer
-                train_story = np.zeros([VOCABULARY_SIZE,50])
-                train_qu = np.zeros([VOCABULARY_SIZE])
-                train_answer = np.zeros([VOCABULARY_SIZE])
-                feed_dict = {story_data: train_story, question_data: train qu, answer_data: train_answer}
-                _,l = session.run([optimizer, loss], feed_dict = feed_dict)
-                total_loss +=l
-                if step%50000==0 and step!=0:
-                    #Create checkpoint
-                    print(t_data)
-                    if os.path.isfile("memn2n.ckpt"):
-                        os.remove("memn2n.ckpt")
-                        checkpoint = saver.save(session, "memn2n.ckpt")
-                if step%epoch_size ==0 and step !=0:
-                    #Store loss values for the epoch
-                    loss_values.append(total_loss/epoch_size)
-                    total_loss =0
-            embeddings = 
+
+            # Num steps is the number of vocabulary
+            for currEpoch in xrange(epoch_size):
+                for step in xrange(num_steps):
+                    #TODO Call batch generator and replace train_story, train_qu, train_answer
+                    '''
+                    train_story = np.zeros([10,VOCABULARY_SIZE])
+                    train_qu = np.zeros([1,VOCABULARY_SIZE])
+                    train_answer = np.zeros([1,VOCABULARY_SIZE])
+                    '''
+
+                    train_story = X[step]
+                    train_qu = np.reshape(q[step], (1,VOCABULARY_SIZE))
+                    train_answer = np.reshape(a[step], (1,VOCABULARY_SIZE))
+
+                    feed_dict = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
+
+                    _,l = session.run([optimizer, loss], feed_dict = feed_dict)
+
+                    total_loss +=l
+                    
+                    '''
+                    if step % 50000==0 and step!=0:
+                        #Create checkpoint
+                        print(t_data)
+                        if os.path.isfile("memn2n.ckpt"):
+                            os.remove("memn2n.ckpt")
+                            checkpoint = saver.save(session, "memn2n.ckpt")
+                    '''
+                #Store loss values for the epoch
+                loss_values.append(total_loss/num_steps)
+                total_loss = 0.0
+
+             
             print("Training done!")
+
         #Print loss plot
         pylab.ylabel("Loss")
         pylab.xlabel("Step #")
         loss_value_array = np.array(loss_values)
-        pylab.plot(np.arange(1,100000, 1001),loss_values)
+        pylab.plot(np.arange(0,epoch_size, 1),loss_values)
+           
         pylab.show()  
-    """
+
+
