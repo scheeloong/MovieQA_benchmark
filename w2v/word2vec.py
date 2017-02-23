@@ -25,8 +25,8 @@ class Word2Vec(object):
 
     def normalize(self, mat):
         if mat.ndim == 1:
-            return mat/np.linalg.norm(mat)
-        return mat/np.linalg.norm(mat, axis=1, keepdims=True)
+            return mat/(np.linalg.norm(mat)+1e-6)
+        return mat/(np.linalg.norm(mat, axis=1, keepdims=True)+1e-6)
 
     def tokenize_text(self, words):
         ''' Convert cleaned text into list of tokens/word-ids.
@@ -63,6 +63,7 @@ class Word2Vec(object):
         clean_sentence = self._filter_sentence(sentence) 
         sentence_vector = self.embeddings[self.tokenize_text(clean_sentence)]
         normalized_sentence_vector = self.normalize(np.average(sentence_vector, axis=0))
+        #print(normalized_sentence_vector.shape)
         return normalized_sentence_vector
 
     def get_vectors_for_raw_text(self, text):
@@ -75,7 +76,8 @@ class Word2Vec(object):
         ''' Get a matrix of embeddings for a text with multiple sentences (i.e. plot).
             Assume text has already been cleaned.
         '''
-        embedding_matrix = np.array([self.get_sentence_vector(line) 
-                        for line in cleaned_text if line!=''])
+        embedding_matrix = np.array([self.get_sentence_vector(line) if line!="" 
+                                     else np.zeros(self.embeddings.shape[1]) 
+                                     for line in cleaned_text ])
 
         return embedding_matrix

@@ -4,9 +4,8 @@ from w2v.word2vec import Word2Vec
 
 
 class W2VTester(object):
-    def __init__(self, extension='plt'):
-        mqa = MovieQA.DataLoader()
-        story_raw, self.qa = mqa.get_story_qa_data('train', 'plot')
+    def __init__(self, story_raw, qa, extension='plt'):
+        self.qa = qa
         self.w2v = Word2Vec(extension)
 
         # Build each plot into a matrix of sentence embeddings.
@@ -14,7 +13,9 @@ class W2VTester(object):
         for imdb_key in story_raw:
             self.story_matrices[imdb_key] = self.w2v.get_vectors_for_raw_text(story_raw[imdb_key])
 
-    def predict(self, q):
+    def score(self, q):
+        ''' Make a prediction for the QA. 
+        '''
         # Process question and answers.
         question = self.w2v.get_sentence_vector(q.question) 
         answers = self.w2v.get_text_vectors(q.answers)  
@@ -23,9 +24,17 @@ class W2VTester(object):
         qscore = self.story_matrices[q.imdb_key].dot(question).reshape(-1, 1)
         ascore = self.story_matrices[q.imdb_key].dot(answers.T)
         score = ascore + qscore
+        return score
+
+    def predict(self, q):
+        scores = self.score(q)
         # Prediction is (plot line#, answer#)
-        prediction = np.unravel_index(score.argmax(), score.shape)
-        return prediction[1], prediction[0], score[prediction]
+        prediction = np.unravel_index(scores.argmax(), scores.shape)
+        #print scores.shape
+        #prediction = scores.argmax()
+        #print prediction
+        #return prediction, "", scores[prediction]
+        return prediction[1], prediction[0], scores[prediction]
 
     def test(self):
         ''' Run w2v on the plots.
@@ -45,5 +54,7 @@ class W2VTester(object):
 
 
 if __name__ == "__main__":
-    w2v_tester = W2VTester()
+    mqa = MovieQA.DataLoader()
+    story_raw, qa = mqa.get_story_qa_data('train', 'plot')
+    w2v_tester = W2VTester(story_raw, qa)
     w2v_tester.test()

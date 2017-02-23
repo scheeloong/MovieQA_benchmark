@@ -18,20 +18,20 @@ class TfIdf(object):
           It also does not normalize the TFIDF score as they are rank invariant.
         Space Complexity, S(V,M) = O(V)
           Idfvec = 12k * 1 = 12k memory
-          Store counter for each movie for each iteration => 12k * 1 
+          Store counter for each movie for each iteration => 12k * 1
           and override since won't need to read it again after each movie.
     """
-    
+
     def __init__(self, story):
         """
         Story are the list of all available plots for the movie.
         Each plot contains a number of
         """
 
-        # Tokenize alphanumeric with dash, lowercase, stem.  
+        # Tokenize alphanumeric with dash, lowercase, stem.
         self.tokenizer = MovieTokenizer("[\w]+")
 
-        # All the stories 
+        # All the stories
         # [keyForStory, allPlotsForStory]
         self.story = story
 
@@ -62,7 +62,7 @@ class TfIdf(object):
         """
                                 movieId_1       ...    movieId_numberOfMovies
                                 ____________|_______|________________________
-        word_1             | tfidf(word_1, movieId_1)            |       |  
+        word_1             | tfidf(word_1, movieId_1)            |       |
         ...                |                |       |
         word_numberOfWords |                |       |
         """
@@ -94,7 +94,7 @@ class TfIdf(object):
 
     def inverseDocumentFrequency(self, word):
         """
-        Returns the inverse document frequency of the 
+        Returns the inverse document frequency of the
         given word that is calculated from all stories.
         """
         count = 0.0
@@ -114,6 +114,14 @@ class TfIdf(object):
                 sentenceVec[self.tfIdfMatrix.getWordIndex(currWord)] = self.tfIdfMatrix.getScore(currWord, movieKey)
         return sentenceVec
 
+    def getSentenceVectors(self, movieKey, sentences):
+        ''' Sentences is a list of strings.
+        '''
+        embedding_matrix = np.zeros((len(sentences),self.numberOfWords))
+        for i, sentence in enumerate(sentences):
+            embedding_matrix[i] = self.getSentenceVector(movieKey, sentence)
+        return embedding_matrix
+
     def getWordScoreArray(self, movieKey, sentence):
         ''' sentence is a string.
         '''
@@ -124,4 +132,4 @@ class TfIdf(object):
                 sentenceVec[i] = self.tfIdfMatrix.getScore(currWord, movieKey)
 
         return sentenceVec
-        
+
