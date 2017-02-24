@@ -204,7 +204,7 @@ if __name__=="__main__":
 
     X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
 
-    epoch_size = 50
+    epoch_size = 10
     print 'epoch size is', epoch_size
     
 
