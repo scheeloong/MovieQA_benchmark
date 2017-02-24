@@ -23,7 +23,7 @@ class BabiParser(object):
         self.fileNames = ["qa1_single-supporting-fact_train.txt"]
         #self.fileNames = ["temp.txt"]
         self.vocabularyToIndex = {}
-        self.numWords = 0
+        self.numWords = 1 # Keep 0th index to represent no word
         self.numStory = 0
         self.maxSentencePerStory = 0
         self.numQuestion = 0
@@ -50,7 +50,7 @@ class BabiParser(object):
         '''
 
     def getBabiTask(self):
-        return self.X, self.q, self.a, self.maxSentencePerStory, self.numWords, self.numQuestion
+        return self.XSentence, self.qSentence, self.aSentence, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords
 
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
@@ -61,7 +61,7 @@ class BabiParser(object):
 
     def getSentenceVector(self, oneHotSentence):
         # Assign default values to a word that doesn't exist in the dictionary
-        sentenceVec  = np.ones(self.maxWordInSentence) * self.numWords
+        sentenceVec  = np.zeros(self.maxWordInSentence)
         index = 0
         vocabularyIndex = 0
         for val in oneHotSentence:
@@ -197,16 +197,14 @@ class BabiParser(object):
 if __name__=="__main__":
     B = BabiParser()
 
-    VOCABULARY_SIZE = 19 #Number of recognized words; V in paper
     MIN_WORD_FREQEUNCY = 5
-    SENTENCE_LENGTH = 20 #Max number of words in a sentence
     #TODO change max number of sentences
     max_num_sentences = 10 
     max_sentence_length = 30
 
-    X, q, a, max_num_sentences, VOCABULARY_SIZE, num_steps = B.getBabiTask()
+    X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
 
-    epoch_size = 10
+    epoch_size = 3
     print 'epoch size is', epoch_size
     
 
@@ -241,15 +239,18 @@ if __name__=="__main__":
         W = tf.Variable(tf.truncated_normal([embed_dim, SENTENCE_LENGTH], stddev=1.0 / math.sqrt(embed_dim)))
         #W_biases = tf.Variable(tf.zeros([embed_dim]))
 
+
         #Initialize random embeddings
-        embeddings_A = tf.Variable(tf.random_uniform([SENTENCE_LENGTH, embed_dim], -1,1))
-        embeddings_B = tf.Variable(tf.random_uniform([SENTENCE_LENGTH, embed_dim], -1,1))
-        embeddings_C = tf.Variable(tf.random_uniform([SENTENCE_LENGTH, embed_dim], -1,1))
+        embeddings_A = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1), name="VariableEmbeddingA")
+        embeddings_B = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1), name="VariableEmbeddingB")
+        embeddings_C = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1), name="VariableEmbeddingC")
+
 
         #Hidden layers for word encodings (sum words to get sentence representation)
-        memory_matrix_m = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_A, story_data),1)
-        control_signal_u = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_B, question_data),1)
-        c_set= tf.reduce_sum(tf.nn.embedding_lookup(embeddings_C, story_data),1)
+        memory_matrix_m = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_A, story_data, name="EmbeddingM"),1)
+
+        control_signal_u = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_B, question_data, name="EmbeddingU"),1)
+        c_set= tf.reduce_sum(tf.nn.embedding_lookup(embeddings_C, story_data, name="EmbeddingCSet"),1)
         
         memory_selection = tf.matmul(memory_matrix_m, tf.transpose(control_signal_u))
         p = tf.nn.softmax(memory_selection)
@@ -265,20 +266,18 @@ if __name__=="__main__":
         #Squared error between predicted and actual answer
         #pdb.set_trace()
         #TODO: Verify that labels should be col vec. and not row vec.
-        loss += tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,SENTENCE_LENGTH]))
+        loss = tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,SENTENCE_LENGTH]))
         
         #Optimzier
         #TODO: Try using stochastic gradient descent instead
         optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
-
-
 
         loss_values = []
         
         #Train the model
         with tf.Session(graph=graph) as session:
             #Initialize variables
-            tf.initialize_all_variables().run()
+            tf.global_variables_initializer().run()
             print('Variables initialized')
 
 
@@ -288,12 +287,9 @@ if __name__=="__main__":
                 saver.restore(session, "memn2n.ckpt")
 
 
-            total_epoch_loss =0 
-            # TODO: Temp
-            epoch_size = 2
-            num_steps = 5
+            total_epoch_loss = 0 
 
-            # Num steps is the number of vocabulary
+            # Num steps is the total number of questions
             for currEpoch in xrange(epoch_size):
                 for step in xrange(num_steps):
                     #TODO Call batch generator and replace train_story, train_qu, train_answer
