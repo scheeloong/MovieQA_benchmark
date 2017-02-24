@@ -50,7 +50,7 @@ class BabiParser(object):
         '''
 
     def getBabiTask(self):
-        return self.XSentence, self.qSentence, self.aSentence, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords
+        return self.XSentence, self.qSentence, self.a, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords
 
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
@@ -204,7 +204,7 @@ if __name__=="__main__":
 
     X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
 
-    epoch_size = 3
+    epoch_size = 50
     print 'epoch size is', epoch_size
     
 
@@ -224,7 +224,7 @@ if __name__=="__main__":
         
         story_data = tf.placeholder(tf.int32, shape=[max_num_sentences, SENTENCE_LENGTH], name="storydata")
         question_data = tf.placeholder(tf.int32, shape=[1,SENTENCE_LENGTH], name="questiondata")
-        answer_data = tf.placeholder(tf.int32, shape=[1,SENTENCE_LENGTH], name="answerdata") #1hot vector of answer
+        answer_data = tf.placeholder(tf.int32, shape=[1,VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
 
         #word encodings
         #A_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
@@ -236,7 +236,7 @@ if __name__=="__main__":
         #C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
 
         #Prediction weight matrix
-        W = tf.Variable(tf.truncated_normal([embed_dim, SENTENCE_LENGTH], stddev=1.0 / math.sqrt(embed_dim)))
+        W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
         #W_biases = tf.Variable(tf.zeros([embed_dim]))
 
 
@@ -250,25 +250,35 @@ if __name__=="__main__":
         memory_matrix_m = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_A, story_data, name="EmbeddingM"),1)
 
         control_signal_u = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_B, question_data, name="EmbeddingU"),1)
+
+        # Get training control values
         c_set= tf.reduce_sum(tf.nn.embedding_lookup(embeddings_C, story_data, name="EmbeddingCSet"),1)
-        
+       
+        # Use memory multplied with control to select a story
         memory_selection = tf.matmul(memory_matrix_m, tf.transpose(control_signal_u))
+
+        # Calculate which story to select
         p = tf.nn.softmax(memory_selection)
         #pdb.set_trace()
-        #NOTE: For newer versions of tensorflow, change tf.mul to tf.multiply
+
+        # Select the story
         o = tf.reduce_sum(tf.mul(c_set, p),0)
 
         #Note: For newer versions of tensorflow, change tf.add to tf.sum
 
+        # Calculate the sum
         o_u_sum = tf.add(tf.reshape(o, [1,embed_dim]),control_signal_u)
-        predicted_answer_labels = tf.nn.softmax(tf.matmul(o_u_sum,W))
-        
+
+        # Get the sum multiplied by W
+        predicted_answer_labels = tf.matmul(o_u_sum,W)
+
         #Squared error between predicted and actual answer
         #pdb.set_trace()
         #TODO: Verify that labels should be col vec. and not row vec.
-        loss = tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,SENTENCE_LENGTH]))
+        answerY = tf.reshape(answer_data, [1,VOCABULARY_SIZE])
+        loss = tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,VOCABULARY_SIZE]))
         
-        #Optimzier
+        #Optimizer
         #TODO: Try using stochastic gradient descent instead
         optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
 
@@ -280,7 +290,6 @@ if __name__=="__main__":
             tf.global_variables_initializer().run()
             print('Variables initialized')
 
-
             #Restore checkpoint
             if os.path.isfile("memn2n.ckpt"):
                 print("Resuming from checkpoint")
@@ -289,6 +298,7 @@ if __name__=="__main__":
 
             total_epoch_loss = 0 
 
+            total_loss = 0.0
             # Num steps is the total number of questions
             for currEpoch in xrange(epoch_size):
                 for step in xrange(num_steps):
@@ -301,14 +311,22 @@ if __name__=="__main__":
 
                     train_story = X[step]
                     train_qu = np.reshape(q[step], (1,SENTENCE_LENGTH))
-                    train_answer = np.reshape(a[step], (1,SENTENCE_LENGTH))
+                    train_answer = np.reshape(a[step], (1,VOCABULARY_SIZE))
 
-                    feed_dict = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
+                    feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
-                    _,l = session.run([optimizer, loss], feed_dict = feed_dict)
+                    _,l,yhat,y = session.run([optimizer, loss, predicted_answer_labels, answerY], feed_dict = feed_dictS)
+                    
+                    '''
+                    print 'EVALUATION YHAT AND Y'
+                    print yhat
+                    print y
+                    print l
+                    '''
+                    
+                    total_loss += l
 
                     
-                    loss_values.append(l)
                     '''
                     if step % 50000==0 and step!=0:
                         #Create checkpoint
@@ -318,6 +336,9 @@ if __name__=="__main__":
                             checkpoint = saver.save(session, "memn2n.ckpt")
                     '''
                 #Store loss values for the epoch
+                loss_values.append(total_loss)
+                print currEpoch
+                print total_loss
                 total_loss = 0.0
              
             print("Training done!")
@@ -326,7 +347,7 @@ if __name__=="__main__":
         pylab.ylabel("Loss")
         pylab.xlabel("Step #")
         loss_value_array = np.array(loss_values)
-        pylab.plot(np.arange(0,epoch_size*num_steps, 1),loss_values)
+        pylab.plot(np.arange(0,epoch_size, 1),loss_values)
            
         pylab.show()  
 
