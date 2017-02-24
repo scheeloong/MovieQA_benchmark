@@ -199,6 +199,7 @@ if __name__=="__main__":
 
     VOCABULARY_SIZE = 19 #Number of recognized words; V in paper
     MIN_WORD_FREQEUNCY = 5
+    SENTENCE_LENGTH = 20 #Max number of words in a sentence
     #TODO change max number of sentences
     max_num_sentences = 10 
     max_sentence_length = 30
@@ -223,9 +224,9 @@ if __name__=="__main__":
         #Initial loss
         loss =0
         
-        story_data = tf.placeholder(tf.int32, shape=[max_num_sentences, VOCABULARY_SIZE], name="storydata")
-        question_data = tf.placeholder(tf.int32, shape=[1,VOCABULARY_SIZE], name="questiondata")
-        answer_data = tf.placeholder(tf.int32, shape=[1,VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
+        story_data = tf.placeholder(tf.int32, shape=[max_num_sentences, SENTENCE_LENGTH], name="storydata")
+        question_data = tf.placeholder(tf.int32, shape=[1,SENTENCE_LENGTH], name="questiondata")
+        answer_data = tf.placeholder(tf.int32, shape=[1,SENTENCE_LENGTH], name="answerdata") #1hot vector of answer
 
         #word encodings
         #A_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
@@ -237,13 +238,13 @@ if __name__=="__main__":
         #C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
 
         #Prediction weight matrix
-        W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
+        W = tf.Variable(tf.truncated_normal([embed_dim, SENTENCE_LENGTH], stddev=1.0 / math.sqrt(embed_dim)))
         #W_biases = tf.Variable(tf.zeros([embed_dim]))
 
         #Initialize random embeddings
-        embeddings_A = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
-        embeddings_B = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
-        embeddings_C = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1))
+        embeddings_A = tf.Variable(tf.random_uniform([SENTENCE_LENGTH, embed_dim], -1,1))
+        embeddings_B = tf.Variable(tf.random_uniform([SENTENCE_LENGTH, embed_dim], -1,1))
+        embeddings_C = tf.Variable(tf.random_uniform([SENTENCE_LENGTH, embed_dim], -1,1))
 
         #Hidden layers for word encodings (sum words to get sentence representation)
         memory_matrix_m = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_A, story_data),1)
@@ -264,7 +265,7 @@ if __name__=="__main__":
         #Squared error between predicted and actual answer
         #pdb.set_trace()
         #TODO: Verify that labels should be col vec. and not row vec.
-        loss += tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,VOCABULARY_SIZE]))
+        loss += tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,SENTENCE_LENGTH]))
         
         #Optimzier
         #TODO: Try using stochastic gradient descent instead
@@ -303,8 +304,8 @@ if __name__=="__main__":
                     '''
 
                     train_story = X[step]
-                    train_qu = np.reshape(q[step], (1,VOCABULARY_SIZE))
-                    train_answer = np.reshape(a[step], (1,VOCABULARY_SIZE))
+                    train_qu = np.reshape(q[step], (1,SENTENCE_LENGTH))
+                    train_answer = np.reshape(a[step], (1,SENTENCE_LENGTH))
 
                     feed_dict = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
