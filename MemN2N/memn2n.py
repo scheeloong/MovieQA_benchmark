@@ -236,7 +236,7 @@ if __name__=="__main__":
         #C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
 
         #Prediction weight matrix
-        W = tf.Variable(tf.truncated_normal([embed_dim, SENTENCE_LENGTH], stddev=1.0 / math.sqrt(embed_dim)))
+        W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
         #W_biases = tf.Variable(tf.zeros([embed_dim]))
 
 
