@@ -204,7 +204,7 @@ if __name__=="__main__":
 
     X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
 
-    epoch_size = 10
+    epoch_size = 100
     print 'epoch size is', epoch_size
     
 
@@ -272,11 +272,20 @@ if __name__=="__main__":
 
         # Get the sum multiplied by W
         predicted_answer_labels = tf.matmul(o_u_sum,W)
+        y_predicted = predicted_answer_labels
 
         #Squared error between predicted and actual answer
         #pdb.set_trace()
         #TODO: Verify that labels should be col vec. and not row vec.
         answerY = tf.reshape(answer_data, [1,VOCABULARY_SIZE])
+        y_target = answerY
+
+        # Multi-class Classification
+        argyPredict  = tf.argmax(y_predicted,1)
+        argyTarget = tf.argmax(y_target,1)
+        correctPred = tf.equal(tf.argmax(y_predicted, 1), tf.argmax(y_target, 1))
+        accuracy = tf.cast(correctPred, "float")
+
         loss = tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,VOCABULARY_SIZE]))
         
         #Optimizer
@@ -296,12 +305,12 @@ if __name__=="__main__":
                 print("Resuming from checkpoint")
                 saver.restore(session, "memn2n.ckpt")
 
-
             total_epoch_loss = 0 
 
             total_loss = 0.0
             # Num steps is the total number of questions
             for currEpoch in xrange(epoch_size):
+                numCorrect = 0.0
                 for step in xrange(num_steps):
                     #TODO Call batch generator and replace train_story, train_qu, train_answer
                     '''
@@ -316,15 +325,18 @@ if __name__=="__main__":
 
                     feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
-                    _,l,yhat,y = session.run([optimizer, loss, predicted_answer_labels, answerY], feed_dict = feed_dictS)
+                    _,l,yhat,y, acc, argyhat, argy = session.run([optimizer, loss, predicted_answer_labels, answerY, accuracy, argyPredict, argyTarget], feed_dict = feed_dictS)
                     
                     '''
                     print 'EVALUATION YHAT AND Y'
-                    print yhat
-                    print y
+                    print 'yhat', yhat
+                    print 'argyhat', argyhat
+                    print 'y', y
+                    print 'argy', argy
                     print l
                     '''
                     
+                    numCorrect += acc
                     total_loss += l
 
                     
@@ -338,9 +350,12 @@ if __name__=="__main__":
                     '''
                 #Store loss values for the epoch
                 loss_values.append(total_loss)
-                print currEpoch
-                print total_loss
+                accuracyThisEpoch = numCorrect/float(num_steps)
+                print 'EpochNum:', currEpoch
+                print 'TotalLoss:', total_loss
+                print 'Accuracy:', accuracyThisEpoch
                 total_loss = 0.0
+                numCorrect = 0.0
              
             print("Training done!")
 
