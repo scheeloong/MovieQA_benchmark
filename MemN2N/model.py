@@ -110,9 +110,9 @@ if __name__=="__main__":
 
             for step in range(num_steps):
                 #TODO Call batch generator and replace train_story, train_qu, train_answer
-                train_story = np.zeros([10,VOCABULARY_SIZE])
-                train_qu = np.zeros([1,VOCABULARY_SIZE])
-                train_answer = np.zeros([1,VOCABULARY_SIZE])
+                train_story = np.zeros([10,SENTENCE_SIZE])
+                train_qu = np.zeros([1,SENTENCE_SIZE])
+                train_answer = np.zeros([1,SENTENCE_SIZE])
 
                 feed_dict = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
