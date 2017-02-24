@@ -214,6 +214,7 @@ if __name__=="__main__":
     embed_dim = 80 #Embedding vector dimension; d in paper
     batch_size = 128
     total_loss = 0.0
+    learningRate = 0.1
 
     #Create tensorflow graph
     graph = tf.Graph()
@@ -280,7 +281,7 @@ if __name__=="__main__":
         
         #Optimizer
         #TODO: Try using stochastic gradient descent instead
-        optimizer = tf.train.AdagradOptimizer(1.0).minimize(loss)
+        optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
 
         loss_values = []
         
