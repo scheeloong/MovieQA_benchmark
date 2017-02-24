@@ -27,22 +27,28 @@ class BabiParser(object):
         self.numStory = 0
         self.maxSentencePerStory = 0
         self.numQuestion = 0
+        self.maxWordInSentence = 0
         # Parse the vocabulary
         self.parseBabiTaskVocabulary()
         # Parse the vectors to get X, q, a (input, question, answer) sentence vectors
-        self.X, self.q, self.a = self.parseBabiTaskVectors()
+        self.X, self.q, self.a, self.XSentence, self.qSentence, self.aSentence = self.parseBabiTaskVectors()
         print 'numWords:', self.numWords
         print 'numStory:', self.numStory
         print 'maxSentencePerStory:', self.maxSentencePerStory
+        print 'maxWordPerSentence:', self.maxWordInSentence
         print 'numQuestion:', self.numQuestion
         print 'Input Shape:', self.X.shape
         print 'Question Shape:', self.q.shape
         print 'Answer Shape:', self.a.shape
         '''
         print self.X
+        print self.XSentence
         print self.q
+        print self.qSentence
         print self.a 
+        print self.aSentence
         '''
+
     def getBabiTask(self):
         return self.X, self.q, self.a, self.maxSentencePerStory, self.numWords, self.numQuestion
 
@@ -53,7 +59,19 @@ class BabiParser(object):
         self.numWords += 1
         return
 
-    def getSentenceVector(self, sentence):
+    def getSentenceVector(self, oneHotSentence):
+        # Assign default values to a word that doesn't exist in the dictionary
+        sentenceVec  = np.ones(self.maxWordInSentence) * self.numWords
+        index = 0
+        vocabularyIndex = 0
+        for val in oneHotSentence:
+            if val == 1:
+                sentenceVec[index] = vocabularyIndex
+                index += 1
+            vocabularyIndex += 1
+        return sentenceVec
+
+    def getSentenceOneHotVector(self, sentence):
         rowVector = list()
         for word in sentence.split():
             rowVector.append(self.vocabularyToIndex[word])
@@ -89,6 +107,8 @@ class BabiParser(object):
                     question = lineSplit[0].split(' ', 1)[1].strip()
                     question = question.translate(None, string.punctuation)
                     answer = lineSplit[1].strip()
+                    self.maxWordInSentence = max(len(question.split(' ')), self.maxWordInSentence)
+                    self.maxWordInSentence = max(len(answer.split(' ')), self.maxWordInSentence)
                     for currWord in question.split(' '):
                         self.insertVocabulary(currWord)
                     for currWord in answer.split(' '):
@@ -99,6 +119,7 @@ class BabiParser(object):
                     self.maxSentencePerStory = max(self.maxSentencePerStory, numSentencePerStory)
                     sentence = currLine.split(' ', 1)[1].strip()
                     sentence = sentence.translate(None, string.punctuation)
+                    self.maxWordInSentence = max(len(sentence.split(' ')), self.maxWordInSentence)
                     for currWord in sentence.split(' '):
                         self.insertVocabulary(currWord)
         # Done inserting all word
@@ -116,7 +137,12 @@ class BabiParser(object):
         q = np.zeros((self.numQuestion, self.numWords))
         a = np.zeros((self.numQuestion, self.numWords))
 
-        currX = np.zeros((self.numWords, self.maxSentencePerStory))
+        XSent = np.zeros((self.numQuestion, self.maxSentencePerStory, self.maxWordInSentence))
+        qSent = np.zeros((self.numQuestion, self.maxWordInSentence))
+        aSent = np.zeros((self.numQuestion, self.maxWordInSentence))
+
+        currX = np.zeros((self.maxSentencePerStory, self.numWords))
+        currXSent = np.zeros((self.maxSentencePerStory, self.maxWordInSentence))
         numQ = 0
 
         # Create the matrix
@@ -128,6 +154,7 @@ class BabiParser(object):
                 if Id == "1":
                     # Create a new currX
                     currX = np.zeros((self.maxSentencePerStory, self.numWords))
+                    currXSent = np.zeros((self.maxSentencePerStory, self.maxWordInSentence))
                     # Initialize the story to be at the 0th position
                     numXStory = 0
 
@@ -140,25 +167,32 @@ class BabiParser(object):
                     question = question.translate(None, string.punctuation)
                     answer = lineSplit[1].strip()
 
-                    questionVec = self.getSentenceVector(question)
-                    # TODO: What to do with answerVec
-                    answerVec = self.getSentenceVector(answer)
+                    questionVec = self.getSentenceOneHotVector(question)
+                    answerVec = self.getSentenceOneHotVector(answer)
+                    questionVecSent = self.getSentenceVector(questionVec)
+                    answerVecSent = self.getSentenceVector(answerVec)
 
                     # Append current X into X
                     X[numQ] = currX
+                    XSent[numQ] = currXSent
 
                     # Append q into currentQ
                     q[numQ] = questionVec
+                    qSent[numQ] = questionVecSent
                     a[numQ] = answerVec
+                    aSent[numQ] = answerVecSent
                     numQ += 1
+
                 # A Sentence
                 else:
                     sentence = currLine.split(' ', 1)[1].strip()
                     sentence = sentence.translate(None, string.punctuation)
-                    sentenceVec = self.getSentenceVector(sentence)
+                    sentenceVec = self.getSentenceOneHotVector(sentence)
+                    sentenceVecSent = self.getSentenceVector(sentenceVec)
                     currX[numXStory] = sentenceVec
+                    currXSent[numXStory] = sentenceVecSent 
                     numXStory += 1
-        return X, q, a
+        return X, q, a, XSent, qSent, aSent
 
 if __name__=="__main__":
     B = BabiParser()
@@ -254,6 +288,9 @@ if __name__=="__main__":
 
 
             total_epoch_loss =0 
+            # TODO: Temp
+            epoch_size = 2
+            num_steps = 5
 
             # Num steps is the number of vocabulary
             for currEpoch in xrange(epoch_size):
