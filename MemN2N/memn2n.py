@@ -196,33 +196,23 @@ class BabiParser(object):
 
 if __name__=="__main__":
     B = BabiParser()
-
     MIN_WORD_FREQEUNCY = 5
-    #TODO change max number of sentences
-    max_num_sentences = 10 
-    max_sentence_length = 30
-
     X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
-
-    epoch_size = 100
+    epoch_size = 100 # 25 * 4 
     print 'epoch size is', epoch_size
-    
 
     #TODO: BATCH/CLEANING
-
     #Graph parameters
-    embed_dim = 80 #Embedding vector dimension; d in paper
-    batch_size = 128
+    num_hops = 3 # TODO Implement number of hops
+    embed_dim = 20 # Embedding vector dimension; d in paper for independent training
+    #embed_dim = 2 # TEMP DEBUG
+    batch_size = 128 # TODO: Implement this
     total_loss = 0.0
-    learningRate = 0.1
-
+    learningRate = 0.02 # according to paper, will be 0.01 before first iteration
     #Create tensorflow graph
     graph = tf.Graph()
 
     with graph.as_default(), tf.device('/cpu:0'):
-        #Initial loss
-        loss =0
-        
         story_data = tf.placeholder(tf.int32, shape=[max_num_sentences, SENTENCE_LENGTH], name="storydata")
         question_data = tf.placeholder(tf.int32, shape=[1,SENTENCE_LENGTH], name="questiondata")
         answer_data = tf.placeholder(tf.int32, shape=[1,VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
@@ -237,19 +227,31 @@ if __name__=="__main__":
         #C_biases = tf.Variable(tf.zeros([VOCABULARY_SIZE,1]))
 
         #Prediction weight matrix
-        W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=1.0 / math.sqrt(embed_dim)))
+        W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=0.05)) # 5.1 of paper
         #W_biases = tf.Variable(tf.zeros([embed_dim]))
 
 
         #Initialize random embeddings
-        embeddings_A = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1), name="VariableEmbeddingA")
-        embeddings_B = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1), name="VariableEmbeddingB")
-        embeddings_C = tf.Variable(tf.random_uniform([VOCABULARY_SIZE, embed_dim], -1,1), name="VariableEmbeddingC")
+        # Initialize as normal distribution with mean = 0 and std.deviation = 1 according to paper
+        embeddings_A_temp = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE-1, embed_dim], stddev=0.1), name="VariableEmbeddingA", dtype=tf.float32)
+        embeddings_B_temp = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE-1, embed_dim], stddev=0.1), name="VariableEmbeddingB")
+        embeddings_C_temp = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE-1, embed_dim], stddev=0.1), name="VariableEmbeddingC")
+        # Append 0 values for no words
+        noWordA = tf.Variable(tf.zeros([1, embed_dim]), dtype=tf.float32)
+        noWordB = tf.Variable(tf.zeros([1, embed_dim]), dtype=tf.float32)
+        noWordC = tf.Variable(tf.zeros([1, embed_dim]), dtype=tf.float32)
+        embeddings_A = tf.concat([embeddings_A_temp, noWordA], 0)
+        embeddings_B = tf.concat([embeddings_B_temp, noWordB], 0)
+        embeddings_C = tf.concat([embeddings_C_temp, noWordC], 0)
 
 
+
+        haha = tf.nn.embedding_lookup(embeddings_A, story_data, name="EmbeddingM")
         #Hidden layers for word encodings (sum words to get sentence representation)
+        # This gets a sentence representation for each sentence in a paragraph
         memory_matrix_m = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_A, story_data, name="EmbeddingM"),1)
 
+        # Gets a single sentence representation for that 1 question
         control_signal_u = tf.reduce_sum(tf.nn.embedding_lookup(embeddings_B, question_data, name="EmbeddingU"),1)
 
         # Get training control values
@@ -257,13 +259,14 @@ if __name__=="__main__":
        
         # Use memory multplied with control to select a story
         memory_selection = tf.matmul(memory_matrix_m, tf.transpose(control_signal_u))
+        #memory_selection = tf.matmul(memory_matrix_m, control_signal_u)
 
         # Calculate which story to select
-        p = tf.nn.softmax(memory_selection)
+        p = tf.nn.softmax(memory_selection, 0)
         #pdb.set_trace()
 
         # Select the story
-        o = tf.reduce_sum(tf.mul(c_set, p),0)
+        o = tf.reduce_sum(tf.multiply(c_set, p), 0)
 
         #Note: For newer versions of tensorflow, change tf.add to tf.sum
 
@@ -286,11 +289,12 @@ if __name__=="__main__":
         correctPred = tf.equal(tf.argmax(y_predicted, 1), tf.argmax(y_target, 1))
         accuracy = tf.cast(correctPred, "float")
 
-        loss = tf.nn.softmax_cross_entropy_with_logits(predicted_answer_labels, tf.reshape(answer_data, [1,VOCABULARY_SIZE]))
+        loss = tf.nn.softmax_cross_entropy_with_logits(logits = predicted_answer_labels, labels = tf.reshape(answer_data, [1,VOCABULARY_SIZE]))
         
         #Optimizer
-        #TODO: Try using stochastic gradient descent instead
-        optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
+        #optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
+        #optimizer = tf.train.AdamOptimizer(learningRate).minimize(loss)
+        optimizer = tf.train.GradientDescentOptimizer(learningRate).minimize(loss)
 
         loss_values = []
         
@@ -304,8 +308,6 @@ if __name__=="__main__":
             if os.path.isfile("memn2n.ckpt"):
                 print("Resuming from checkpoint")
                 saver.restore(session, "memn2n.ckpt")
-
-            total_epoch_loss = 0 
 
             total_loss = 0.0
             # Num steps is the total number of questions
@@ -325,7 +327,21 @@ if __name__=="__main__":
 
                     feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
+                    # TODO: Uncomment once done
                     _,l,yhat,y, acc, argyhat, argy = session.run([optimizer, loss, predicted_answer_labels, answerY, accuracy, argyPredict, argyTarget], feed_dict = feed_dictS)
+                    '''
+                    _, a1, a2, a3, a4, a5, a6, a7, a8, a9= session.run([optimizer, story_data, embeddings_A, haha, memory_matrix_m, question_data, control_signal_u, memory_selection, p, o], feed_dict = feed_dictS)
+                    print "story data", a1 
+                    print "Embeddings A", a2
+                    print "Embedding Lookup A", a3
+                    print "Memory Matrix M", a4
+                    print "Question Data", a5
+                    print "Control Signal U" , a6
+                    print "Memory Selection", a7
+                    print "p", a8
+                    print "o", a9
+                    sys.exit(0)
+                    # '''
                     
                     '''
                     print 'EVALUATION YHAT AND Y'
@@ -352,10 +368,14 @@ if __name__=="__main__":
                 loss_values.append(total_loss)
                 accuracyThisEpoch = numCorrect/float(num_steps)
                 print 'EpochNum:', currEpoch
-                print 'TotalLoss:', total_loss
+                print 'LearningRate:', learningRate
+                print 'TotalLossCurrEpoch:', total_loss
                 print 'Accuracy:', accuracyThisEpoch
                 total_loss = 0.0
                 numCorrect = 0.0
+                if not currEpoch % 25:
+                    # LearningRate Annealing
+                    learningRate = learningRate/2.0
              
             print("Training done!")
 
