@@ -194,6 +194,16 @@ class BabiParser(object):
                     numXStory += 1
         return X, q, a, XSent, qSent, aSent
 
+def ShuffleBatches(trainData, trainDataTwo, trainTarget):
+    # Gets the state as the current time
+    rngState = np.random.get_state()
+    np.random.shuffle(trainData)
+    np.random.set_state(rngState)
+    np.random.shuffle(trainDataTwo)
+    np.random.set_state(rngState)
+    np.random.shuffle(trainTarget)
+    return trainData, trainDataTwo, trainTarget
+
 if __name__=="__main__":
     B = BabiParser()
     MIN_WORD_FREQEUNCY = 5
@@ -319,6 +329,7 @@ if __name__=="__main__":
             total_loss = 0.0
             # Num steps is the total number of questions
             for currEpoch in xrange(epoch_size):
+                X, q, a = ShuffleBatches(X,q,a) 
                 numCorrect = 0.0
                 for step in xrange(num_steps/batch_size):
                     #TODO Call batch generator and replace train_story, train_qu, train_answer
