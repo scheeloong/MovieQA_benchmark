@@ -208,6 +208,19 @@ if __name__=="__main__":
     B = BabiParser()
     MIN_WORD_FREQEUNCY = 5
     X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
+    valStart = (num_steps*8)/10
+    testStart = (num_steps*9)/10
+    valX = X[valStart:testStart]
+    valq = q[valStart:testStart]
+    vala = a[valStart:testStart]
+    testX = X[testStart:]
+    testq = q[testStart:]
+    testa = a[testStart:]
+    X = X[:valStart]
+    q = q[:valStart]
+    a = a[:valStart]
+    num_steps = valStart
+
     epoch_size = 100 # 25 * 4 
     epoch_size = 200 # 25 * 4 
     print 'epoch size is', epoch_size
@@ -220,16 +233,16 @@ if __name__=="__main__":
     #batch_size = 125 
     #batch_size = 32
     #batch_size = 20 
-    batch_size = 10
+    batch_size = 5  # TODO: Change to 10
     total_loss = 0.0
     learningRate = 0.02 # according to paper, will be 0.01 before first iteration
     #Create tensorflow graph
     graph = tf.Graph()
 
     with graph.as_default(), tf.device('/cpu:0'):
-        story_data = tf.placeholder(tf.int32, shape=[batch_size, max_num_sentences, SENTENCE_LENGTH], name="storydata")
-        question_data = tf.placeholder(tf.int32, shape=[batch_size, 1,SENTENCE_LENGTH], name="questiondata")
-        answer_data = tf.placeholder(tf.int32, shape=[batch_size, 1,VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
+        story_data = tf.placeholder(tf.int32, shape=[None, max_num_sentences, SENTENCE_LENGTH], name="storydata")
+        question_data = tf.placeholder(tf.int32, shape=[None, 1,SENTENCE_LENGTH], name="questiondata")
+        answer_data = tf.placeholder(tf.int32, shape=[None, 1,VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
 
         #word encodings
         #A_weights = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=1.0 / math.sqrt(embed_dim)))
@@ -285,7 +298,9 @@ if __name__=="__main__":
         #Note: For newer versions of tensorflow, change tf.add to tf.sum
 
         # Calculate the sum
-        o_u_sum = tf.add(tf.reshape(o, [batch_size, 1,embed_dim]),control_signal_u)
+        batchSizing= tf.shape(story_data)[0]
+
+        o_u_sum = tf.add(tf.reshape(o, [batchSizing, 1, embed_dim]), control_signal_u)
 
         # Get the sum multiplied by W
 
@@ -294,9 +309,8 @@ if __name__=="__main__":
         predicted_answer_labels = tf.reshape(predicted_answer_labels, [-1, 1, VOCABULARY_SIZE])
         y_predicted = predicted_answer_labels
 
-        #Squared error between predicted and actual answer
         #pdb.set_trace()
-        answerY = tf.reshape(answer_data, [batch_size, 1, VOCABULARY_SIZE])
+        answerY = tf.reshape(answer_data, [batchSizing, 1, VOCABULARY_SIZE])
         y_target = answerY
 
         # Multi-class Classification
@@ -306,7 +320,7 @@ if __name__=="__main__":
         accuracy = tf.reduce_mean(tf.cast(correctPred, "float"))
 
         # Paper said it didn't average the loss, but it will reach infinity if batch size is too large
-        loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits = predicted_answer_labels, labels = tf.reshape(answer_data, [batch_size, 1,VOCABULARY_SIZE])))
+        loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits = predicted_answer_labels, labels = tf.reshape(answer_data, [batchSizing, 1,VOCABULARY_SIZE])))
         
         #Optimizer
         optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
@@ -325,7 +339,14 @@ if __name__=="__main__":
             if os.path.isfile("memn2n.ckpt"):
                 print("Resuming from checkpoint")
                 saver.restore(session, "memn2n.ckpt")
-
+            val_story = valX[:]
+            val_qu = np.reshape(valq[:], (valq.shape[0],1, SENTENCE_LENGTH))
+            val_a = np.reshape(vala[:], (vala.shape[0],1, VOCABULARY_SIZE))
+            test_story = testX[:]
+            test_qu = np.reshape(testq[:], (testq.shape[0],1, SENTENCE_LENGTH))
+            test_a = np.reshape(testa[:], (testa.shape[0],1, VOCABULARY_SIZE))
+            feed_dictV = {story_data: val_story, question_data: val_qu, answer_data: val_a}
+            feed_dictT = {story_data: test_story, question_data: test_qu, answer_data: test_a}
             total_loss = 0.0
             # Num steps is the total number of questions
             for currEpoch in xrange(epoch_size):
@@ -344,9 +365,8 @@ if __name__=="__main__":
                     train_answer = np.reshape(a[step*batch_size:(step+1)*batch_size], (batch_size, 1,VOCABULARY_SIZE))
 
                     feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
-
-                    # TODO: Uncomment once done
                     _,l,yhat,y, acc, argyhat, argy, correctPrediction = session.run([optimizer, loss, predicted_answer_labels, answerY, accuracy, argyPredict, argyTarget, correctPred], feed_dict = feed_dictS)
+
                     '''
                     _, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11= session.run([optimizer, story_data, embeddings_A, haha, memory_matrix_m, question_data, control_signal_u, memory_selection, p, o, correctPred, accuracy], feed_dict = feed_dictS)
                     print "story data", a1 
@@ -389,6 +409,12 @@ if __name__=="__main__":
                 #Store loss values for the epoch
                 loss_values.append(total_loss)
                 accuracyThisEpoch = numCorrect/float(num_steps)
+                valLoss, valAccuracy = session.run([loss, accuracy], feed_dict = feed_dictV)
+                testLoss, testAccuracy = session.run([loss, accuracy], feed_dict = feed_dictT)
+                print "valLoss", valLoss
+                print "valAcc", valAccuracy
+                print "testLoss", testLoss
+                print "testAcc", testAccuracy
                 print 'EpochNum:', currEpoch
                 print 'LearningRate:', learningRate
                 print 'TotalLossCurrEpoch:', total_loss
