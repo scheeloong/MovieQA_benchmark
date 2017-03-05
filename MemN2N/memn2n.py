@@ -27,6 +27,7 @@ class BabiParser(object):
         self.numWords = 1 # Keep 0th index to represent no word
         self.numStory = 0
         self.maxSentencePerStory = 0
+        self.totalSentence = 0
         self.numQuestion = 0
         self.maxWordInSentence = 0
         # Parse the vocabulary
@@ -36,6 +37,7 @@ class BabiParser(object):
         print 'numWords:', self.numWords
         print 'numStory:', self.numStory
         print 'maxSentencePerStory:', self.maxSentencePerStory
+        print 'totalSentenceAllStories:', self.totalSentence
         print 'maxWordPerSentence:', self.maxWordInSentence
         print 'numQuestion:', self.numQuestion
         print 'Input Shape:', self.X.shape
@@ -51,7 +53,7 @@ class BabiParser(object):
         '''
 
     def getBabiTask(self):
-        return self.X, self.q, self.a, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords
+        return self.X, self.q, self.a, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords, self.XSentence, self.qSentence
 
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
@@ -97,6 +99,7 @@ class BabiParser(object):
                 Id = currLine.split(' ')[0]
                 # Start of a new story
                 if Id == "1":
+                    self.totalSentence += numSentencePerStory # Needed for memory encoding
                     self.numStory += 1
                     numSentencePerStory = 0
                 # A question
@@ -208,7 +211,7 @@ def ShuffleBatches(trainData, trainDataTwo, trainTarget):
 if __name__=="__main__":
     B = BabiParser()
     MIN_WORD_FREQEUNCY = 5
-    X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE = B.getBabiTask()
+    X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE, XSent, qSent, = B.getBabiTask()
     valStart = (num_steps*8)/10
     testStart = (num_steps*9)/10
     valX = X[valStart:testStart]
@@ -235,12 +238,13 @@ if __name__=="__main__":
     a = a[:testStart]
     num_steps = testStart
 
-    epoch_size = 100
+    epoch_size = 30
     print 'epoch size is', epoch_size
 
     #Graph parameters
     num_hops = 3 # TODO Implement number of hops
     embed_dim = 20 # Embedding vector dimension; d in paper for independent training
+    memorySize = 100
     batch_size = 32
     total_loss = 0.0
     learningRate = 0.02 # according to paper, will be 0.01 before first iteration
@@ -251,6 +255,8 @@ if __name__=="__main__":
         story_data = tf.placeholder(tf.float32, shape=[None, max_num_sentences, VOCABULARY_SIZE], name="storydata")
         question_data = tf.placeholder(tf.float32, shape=[None, 1, VOCABULARY_SIZE], name="questiondata")
         answer_data = tf.placeholder(tf.float32, shape=[None, 1, VOCABULARY_SIZE], name="answerdata") #1hot vector of answer
+        storyLookUp = tf.placeholder(tf.float32, shape=[None, 1, SENTENCE_LENGTH], name="abcd") #1hot vector of answer
+        questionLookUp = tf.placeholder(tf.float32, shape=[None, 1, SENTENCE_LENGTH], name="abc") #1hot vector of answer
         #Prediction weight matrix
         W = tf.Variable(tf.truncated_normal([embed_dim, VOCABULARY_SIZE], stddev=0.1)) # 5.1 of paper
         W_biases = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE], stddev=0.1))
@@ -259,6 +265,12 @@ if __name__=="__main__":
         # Initialize as normal distribution with mean = 0 and std.deviation = 1 according to paper
         # To perform matrix multiplication on higher dimensions
         batchSizing= tf.shape(story_data)[0]
+
+        # To encode temporal information on which sentence we are currently on
+        # TODO: Index in reverse order 
+        memoryA = tf.Variable(tf.truncated_normal([max_num_sentences, embed_dim], stddev=0.05), name="VariableEmbeddingA", dtype=tf.float32)
+        memoryB = tf.Variable(tf.truncated_normal([max_num_sentences, embed_dim], stddev=0.05), name="VariableEmbeddingB")
+
         embeddings_A = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=0.05), name="VariableEmbeddingA", dtype=tf.float32)
         embeddings_B = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=0.05), name="VariableEmbeddingB")
         embeddings_C = tf.Variable(tf.truncated_normal([VOCABULARY_SIZE, embed_dim], stddev=0.05), name="VariableEmbeddingC")
@@ -293,6 +305,10 @@ if __name__=="__main__":
         control_signal_u= tf.matmul(tf.reshape(question_data, (batchSizing, VOCABULARY_SIZE)), embeddings_B)
         # Get training control values
         c_set = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*max_num_sentences,VOCABULARY_SIZE)), embeddings_C), (batchSizing, max_num_sentences, embed_dim))
+
+        # Add temporal information
+        memory_matrix_m = tf.add(memory_matrix_m, memoryA)
+        c_set = tf.add(c_set, memoryB)
         # Use memory multplied with control to select a story
         # (b,z,d) * (b,d,1) = (b,z,1)
         memory_selection = tf.reshape(tf.matmul(memory_matrix_m, tf.reshape(control_signal_u, (batchSizing, embed_dim, 1))), (batchSizing, max_num_sentences, 1))
