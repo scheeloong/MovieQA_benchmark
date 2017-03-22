@@ -3,6 +3,7 @@ from src.tfidf import TfIdf
 from src.htmloutput import HtmlOutput 
 from src.memn2nmovie import MemN2N
 from w2v.word2vec import Word2Vec
+import sys
 
 import datetime
 import logging
@@ -48,7 +49,7 @@ class MemN2N(object):
 
         # TODO: Temporary hard coded values below
         self.memorySize = 100
-        self.batchSize = 32
+        self.batchSize = 2 # TODO: Switch to 32 later
         self.learningRate = 0.01
         self.w2v = Word2Vec(extension, postprocess=postprocess)
         self.qa = qa # all the questions
@@ -130,9 +131,6 @@ class MemN2N(object):
             batchSizing= tf.shape(story_data)[0]
 
 
-            tempDebug = answer_data
-
-            '''
             # Parameters to train
             Z = tf.Variable(tf.truncated_normal([self.vocabularySize, self.word2VecDim])) # TODO: Initialize as pre-trained word vector
             T = tf.Variable(tf.truncated_normal([self.word2VecDim, self.embedDim]))
@@ -141,15 +139,20 @@ class MemN2N(object):
             memoryB = tf.Variable(tf.truncated_normal([self.maxNumSentences, self.embedDim], stddev=0.05))
                 
             # TODO: only multiply the embeddings for question, answer, and plots
+            # TODO: CONTINUE HERE AND FIGURE THIS OUT
             # (vocabularySize, embedDim)
             embeddings_A = tf.matmul(Z, T)
             embeddings_B = tf.matmul(Z, T)
             embeddings_C = tf.matmul(Z, T)
             embeddings_F = tf.matmul(Z, T)
 
-            # (b, z, v) * (v, d)  = (b, z, d)
-            answerG = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.vocabularySize)), embeddings_F), (batchSizing, self.maxNumSentences, self.embedDim))
+            '''
 
+            # (b, z, v) * (v, d)  = (b, z, d)
+            answerG = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.embedDim)), embeddings_F), (batchSizing, self.maxNumSentences, self.embedDim))
+
+            tempDebug = answerG
+            '''
             memory_matrix_m = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.vocabularySize)), embeddings_A), (batchSizing, self.maxNumSentences, self.embedDim))
 
             # Hidden layers for word encodings (sum words to get sentence representation)
@@ -214,7 +217,9 @@ class MemN2N(object):
                         train_answer = np.reshape(self.a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers,self.word2VecDim))
                         feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
-                        session.run([tempDebug], feed_dict = feed_dictS)
+                        tempPrint = session.run([tempDebug], feed_dict = feed_dictS)
+                        print tempPrint
+                        sys.exit(0)
 
                         '''
                         _,l,yhat,y, acc, argyhat, argy, correctPrediction = session.run([optimizer, loss, predicted_answer_labels, answer_data, accuracy, argyPredict, argyTarget, correctPred], feed_dict = feed_dictS)
