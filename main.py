@@ -22,6 +22,7 @@ import re # Split by tabs
 import string # To remove punctuation
 
 from matplotlib import pylab #from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
 from collections import OrderedDict, defaultdict, Counter, deque
 from random import shuffle
@@ -61,12 +62,13 @@ class MemN2N(object):
         # w2v contains the embeddings to be trained
 
         # TODO: Temporary hard coded values below
-        self.memorySize = 100
+        # self.memorySize = 100
         self.batchSize = 32 # TODO: Switch to 32 later
         self.learningRate = 0.02
+        self.numEpoch = 50
+
         self.w2v = Word2Vec(extension, postprocess=postprocess)
         self.qa = qa # all the questions
-        self.numEpoch = 20
 
         # Parse the values
         self.word2VecDim = 0  # initialize
@@ -275,11 +277,12 @@ class MemN2N(object):
                         self.learningRate = self.learningRate/2.0 # 4.1 Annealing. 
                 print("Training done!")
             #Print loss plot
-            pylab.ylabel("Loss")
-            pylab.xlabel("Step #")
+            plt.figure(0)
+            plt.ylabel("Loss")
+            plt.xlabel("Step #")
             loss_value_array = np.array(loss_values)
-            pylab.plot(np.arange(0,self.numEpoch, 1),loss_values)
-            pylab.show()  
+            plt.plot(np.arange(0,self.numEpoch, 1),loss_values)
+            plt.savefig("lossPlot" + str(self.numEpoch) + ".png")
 
 def runTfIdf(trainPlots, testQuestions):
     # To output results in a beautified html file
