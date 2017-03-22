@@ -123,6 +123,16 @@ class MemN2N(object):
             self.answerChoices[numQ] = hehe
             numQ += 1
 
+        self.numQuestions = int(self.numQuestions*0.8)
+        self.validX = self.X[self.numQuestions:]
+        self.validq = self.q[self.numQuestions:]
+        self.valida = self.a[self.numQuestions:]
+        self.validAnswerChoices = self.answerChoices[self.numQuestions:]
+        self.X = self.X[:self.numQuestions]
+        self.q = self.q[:self.numQuestions]
+        self.a = self.a[:self.numQuestions]
+        self.answerChoices[:self.numQuestions]
+
         print "maxNumSentence", self.maxNumSentences
         print "word2VecDim", self.word2VecDim
         print "numAnswers", self.numAnswers
@@ -247,14 +257,18 @@ class MemN2N(object):
                         train_answer = np.reshape(self.a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers, self.word2VecDim))
                         train_answer_choices = np.reshape(self.answerChoices[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers))
                         
+                        valid_story = self.validX[:]
+                        valid_qu = np.reshape(self.validq[:], (self.validq.shape[0],1, self.word2VecDim))
+                        valid_answer = np.reshape(self.valida[:], (self.valida.shape[0], self.numAnswers, self.word2VecDim))
+                        valid_answer_choices = np.reshape(self.validAnswerChoices[:], (self.validAnswerChoices.shape[0], self.numAnswers))
                         feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer, proper_answer_data: train_answer_choices}
+                        feed_dictV = {story_data: valid_story, question_data: valid_qu, answer_data: valid_answer, proper_answer_data: valid_answer_choices}
                         # cannot feed 2,5,128 to ?,1,5
 
                         #tempPrint = session.run([tempDebug], feed_dict = feed_dictS)
                         #print tempPrint
 
                         _,l,yhat,y, acc, argyhat, argy, correctPrediction = session.run([optimizer, loss, predicted_answer_labels, answer_data, accuracy, argyPredict, argyTarget, correctPred], feed_dict = feed_dictS)
-
                         #numCorrect += acc # DOesnt work for batchsize > 1
                         #print "CorrectPrediction", correctPrediction
                         total_loss += l
@@ -269,6 +283,10 @@ class MemN2N(object):
                     print 'LearningRate:', self.learningRate
                     print 'TotalLossCurrEpoch:', total_loss
                     print 'AccuracyCurrEpoch:', accuracyThisEpoch
+                    valLoss, valAccuracy = session.run([loss, accuracy], feed_dict = feed_dictV)
+
+                    print "valLoss", valLoss
+                    print "valAcc", valAccuracy
                     total_loss = 0.0
                     numCorrect = 0.0
                     #if not currEpoch % 25:
