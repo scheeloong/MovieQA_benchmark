@@ -109,6 +109,7 @@ class MemN2N(object):
         print "vocabularySize", self.vocabularySize
         print "numQuestions", self.numQuestions
         # self.sentenceLength = 99999 # TODO: Confirm if dont need this
+        print "Done Parsing for MemN2N"
 
         self.buildGraphRunSess()
 
@@ -127,6 +128,9 @@ class MemN2N(object):
             # Initialize as normal distribution with mean = 0 and std.deviation = 1 according to paper
             # To perform matrix multiplication on higher dimensions
             batchSizing= tf.shape(story_data)[0]
+
+
+            tempDebug = answer_data
 
             '''
             # Parameters to train
@@ -193,7 +197,6 @@ class MemN2N(object):
             optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
             '''
 
-            '''
             # TODO: Uncomment once done fixing everything above
             # Run session
             loss_values = []
@@ -206,11 +209,14 @@ class MemN2N(object):
                     # X, q, a = ShuffleBatches(X,q,a) # TODO: 
                     numCorrect = 0.0
                     for step in xrange(self.numQuestions/self.batchSize):
-                        train_story = X[step*self.batchSize:(step+1)*self.batchSize]
-                        train_qu = np.reshape(q[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize,1, self.vocabularySize))
-                        train_answer = np.reshape(a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, 1,self.vocabularySize))
+                        train_story = self.X[step*self.batchSize:(step+1)*self.batchSize]
+                        train_qu = np.reshape(self.q[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize,1, self.word2VecDim))
+                        train_answer = np.reshape(self.a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers,self.word2VecDim))
                         feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
 
+                        session.run([tempDebug], feed_dict = feed_dictS)
+
+                        '''
                         _,l,yhat,y, acc, argyhat, argy, correctPrediction = session.run([optimizer, loss, predicted_answer_labels, answer_data, accuracy, argyPredict, argyTarget, correctPred], feed_dict = feed_dictS)
 
                         #numCorrect += acc # DOesnt work for batchsize > 1
