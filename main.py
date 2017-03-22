@@ -52,32 +52,44 @@ class MemN2N(object):
         self.learningRate = 0.01
         self.w2v = Word2Vec(extension, postprocess=postprocess)
         self.qa = qa # all the questions
+        self.numEpoch = 1
 
         # Parse the values
         self.word2VecDim = 0  # initialize
         self.embedDim = 0 #initialize
         self.maxNumSentences = 0  # initialize
         self.maxNumAnswers = 0 # initialize
+        self.numQuestions = 0 # initialize
         # Embeddings for the story matrices
         self.storyMatrices= {} # storyMatrices indexed by movieKey
         for movieKey in story:
             self.storyMatrices[movieKey] = self.w2v.get_vectors_for_raw_text(story[movieKey])
             self.maxNumSentences = max(self.maxNumSentences, self.storyMatrices[movieKey].shape[0])
+            # TODO: Convert all story data to max numsentences
+
         for movieKey in story:
             self.word2VecDim = self.storyMatrices[movieKey].shape[1]
             self.embedDim = self.word2VecDim # TODO: Confirm if its okay to set as the same
             break
+        for currQA in self.qa:
+            answers = self.w2v.get_text_vectors(currQA.answers) #print "ori question"
+            self.maxNumAnswers = answers.shape[0] 
+            break;
 
+        # Form the 3 input matrices
         for currQA in self.qa:
             question = self.w2v.get_sentence_vector(currQA.question)
             answers = self.w2v.get_text_vectors(currQA.answers) #print "ori question"
-            self.maxNumAnswers = answers.shape[0]
-            break;
+            self.numQuestions += 1
+            #train_story = X[step*self.batchSize:(step+1)*self.batchSize]
+            #train_qu = np.reshape(q[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize,1, self.vocabularySize))
+            #train_answer = np.reshape(a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, 1,self.vocabularySize))
         self.vocabularySize = self.w2v.getNumVocabulary()
         print "maxNumSentence", self.maxNumSentences
         print "word2VecDim", self.word2VecDim
         print "numAnswers", self.maxNumAnswers
         print "vocabularySize", self.vocabularySize
+        print "numQuestions", self.numQuestions
         # self.sentenceLength = 99999 # TODO: Confirm if dont need this
 
         self.buildGraphRunSess()
@@ -98,6 +110,7 @@ class MemN2N(object):
             # To perform matrix multiplication on higher dimensions
             batchSizing= tf.shape(story_data)[0]
 
+            '''
             # Parameters to train
             Z = tf.Variable(tf.truncated_normal([self.vocabularySize, self.word2VecDim])) # TODO: Initialize as pre-trained word vector
             T = tf.Variable(tf.truncated_normal([self.word2VecDim, self.embedDim]))
@@ -106,13 +119,12 @@ class MemN2N(object):
             memoryB = tf.Variable(tf.truncated_normal([self.maxNumSentences, self.embedDim], stddev=0.05))
                 
             # TODO: only multiply the embeddings for question, answer, and plots
-            # (v, d)
+            # (vocabularySize, embedDim)
             embeddings_A = tf.matmul(Z, T)
             embeddings_B = tf.matmul(Z, T)
             embeddings_C = tf.matmul(Z, T)
             embeddings_F = tf.matmul(Z, T)
 
-            '''
             # (b, z, v) * (v, d)  = (b, z, d)
             answerG = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.vocabularySize)), embeddings_F), (batchSizing, self.maxNumSentences, self.embedDim))
 
@@ -163,23 +175,19 @@ class MemN2N(object):
             optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
             '''
 
-            # TODO: Uncomment once done fixing everything above
             '''
+            # TODO: Uncomment once done fixing everything above
             # Run session
             loss_values = []
             with tf.Session(graph=graph) as session:
                 #Initialize variables
                 tf.global_variables_initializer().run()
-                val_story = valX[:]
-                val_qu = np.reshape(valq[:], (valq.shape[0],1, self.vocabularySize))
-                val_a = np.reshape(vala[:], (vala.shape[0],1, self.vocabularySize))
-                feed_dictV = {story_data: val_story, question_data: val_qu, answer_data: val_a}
                 total_loss = 0.0
                 # Num steps is the total number of questions
-                for currEpoch in xrange(epoch_size):
+                for currEpoch in xrange(self.numEpoch):
                     # X, q, a = ShuffleBatches(X,q,a) # TODO: 
                     numCorrect = 0.0
-                    for step in xrange(num_steps/self.batchSize):
+                    for step in xrange(self.numQuestions/self.batchSize):
                         train_story = X[step*self.batchSize:(step+1)*self.batchSize]
                         train_qu = np.reshape(q[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize,1, self.vocabularySize))
                         train_answer = np.reshape(a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, 1,self.vocabularySize))
@@ -211,6 +219,8 @@ class MemN2N(object):
                         # LearningRate Annealing
                         learningRate = learningRate/2.0 # 4.1 Annealing. 
                 print("Training done!")
+                '''
+            '''
             #Print loss plot
             pylab.ylabel("Loss")
             pylab.xlabel("Step #")
