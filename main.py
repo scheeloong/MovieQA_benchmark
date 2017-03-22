@@ -13,6 +13,19 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy import sparse
 import tensorflow as tf
+import os
+import random
+import zipfile
+import collections
+
+import re # Split by tabs
+import string # To remove punctuation
+
+from matplotlib import pylab #from sklearn.manifold import TSNE
+
+from collections import OrderedDict, defaultdict, Counter, deque
+from random import shuffle
+
 
 # TODO: Perform Cross Validation 
 # TODO: Plot a histogram for the scores and see how the graph
@@ -49,11 +62,11 @@ class MemN2N(object):
 
         # TODO: Temporary hard coded values below
         self.memorySize = 100
-        self.batchSize = 2 # TODO: Switch to 32 later
-        self.learningRate = 0.01
+        self.batchSize = 32 # TODO: Switch to 32 later
+        self.learningRate = 0.02
         self.w2v = Word2Vec(extension, postprocess=postprocess)
         self.qa = qa # all the questions
-        self.numEpoch = 1
+        self.numEpoch = 20
 
         # Parse the values
         self.word2VecDim = 0  # initialize
@@ -67,7 +80,6 @@ class MemN2N(object):
         for movieKey in story:
             self.storyMatrices[movieKey] = self.w2v.get_vectors_for_raw_text(story[movieKey])
             self.maxNumSentences = max(self.maxNumSentences, self.storyMatrices[movieKey].shape[0])
-            # TODO: Convert all story data to max numsentences
 
         for movieKey in story:
             self.word2VecDim = self.storyMatrices[movieKey].shape[1]
@@ -89,6 +101,8 @@ class MemN2N(object):
         self.X = np.zeros((self.numQuestions, self.maxNumSentences, self.word2VecDim))
         self.q = np.zeros((self.numQuestions, self.word2VecDim))
         self.a = np.zeros((self.numQuestions, self.numAnswers, self.word2VecDim))
+        self.answerChoices = np.zeros((self.numQuestions, self.numAnswers))
+
         numQ = 0
         for currQA in self.qa:
             question = self.w2v.get_sentence_vector(currQA.question)
@@ -102,6 +116,9 @@ class MemN2N(object):
                 temp = np.vstack((temp, haha))
                 self.storyMatrices[currQA.imdb_key] = temp
             self.X[numQ] = self.storyMatrices[currQA.imdb_key]
+            hehe = np.zeros((self.numAnswers))
+            hehe[currQA.correct_index] = 1
+            self.answerChoices[numQ] = hehe
             numQ += 1
 
         print "maxNumSentence", self.maxNumSentences
@@ -124,15 +141,18 @@ class MemN2N(object):
             story_data = tf.placeholder(tf.float32, shape=[None, self.maxNumSentences, self.embedDim], name="storydata")
             question_data = tf.placeholder(tf.float32, shape=[None, 1, self.embedDim], name="questiondata")
             answer_data = tf.placeholder(tf.float32, shape=[None, self.numAnswers, self.embedDim], name="answerdata") #1hot vector of answer
+            # Correct answer as 1 hot data
+            proper_answer_data = tf.placeholder(tf.float32, shape=[None, self.numAnswers], name = "correctAnswer")
 
             # Initialize random embeddings
             # Initialize as normal distribution with mean = 0 and std.deviation = 1 according to paper
             # To perform matrix multiplication on higher dimensions
             batchSizing= tf.shape(story_data)[0]
 
-
+            # INPUT DATA IS  (numSentence, embedDim)
+ 
             # Parameters to train
-            Z = tf.Variable(tf.truncated_normal([self.vocabularySize, self.word2VecDim])) # TODO: Initialize as pre-trained word vector
+            # Z = tf.Variable(tf.truncated_normal([self.vocabularySize, self.word2VecDim])) # TODO: Initialize as pre-trained word vector
             T = tf.Variable(tf.truncated_normal([self.word2VecDim, self.embedDim]))
             # To encode temporal information on which sentence we are currently on
             memoryA = tf.Variable(tf.truncated_normal([self.maxNumSentences, self.embedDim], stddev=0.05))
@@ -140,64 +160,72 @@ class MemN2N(object):
                 
             # TODO: only multiply the embeddings for question, answer, and plots
             # TODO: CONTINUE HERE AND FIGURE THIS OUT
+            # TODO: PROBLEM: YOU ALREADY CONVERTED TO Z FORM so nothing can be done? 
             # (vocabularySize, embedDim)
-            embeddings_A = tf.matmul(Z, T)
-            embeddings_B = tf.matmul(Z, T)
-            embeddings_C = tf.matmul(Z, T)
-            embeddings_F = tf.matmul(Z, T)
+            # FOR NOW, ITS ESSENTIALLY DOING everything = Z*T = specialZ
+            embeddings_A = T
+            embeddings_B = T
+            embeddings_C = T
+            embeddings_F = T
 
-            '''
+            # (b, a, d) * (d, d)  = (b, a, d)
+            answerG = tf.reshape(tf.matmul(tf.reshape(answer_data, (batchSizing*self.numAnswers,self.embedDim)), embeddings_F), (batchSizing, self.numAnswers, self.embedDim))
 
-            # (b, z, v) * (v, d)  = (b, z, d)
-            answerG = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.embedDim)), embeddings_F), (batchSizing, self.maxNumSentences, self.embedDim))
+            # (b, z, d) * (d, d)  = (b, z, d)
+            memoryMatrixM = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.embedDim)), embeddings_A), (batchSizing, self.maxNumSentences, self.embedDim))
 
-            tempDebug = answerG
-            '''
-            memory_matrix_m = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.vocabularySize)), embeddings_A), (batchSizing, self.maxNumSentences, self.embedDim))
 
             # Hidden layers for word encodings (sum words to get sentence representation)
             # This gets a sentence representation for each sentence in a paragraph
             # Gets a single sentence representation for that 1 question
-            control_signal_u= tf.matmul(tf.reshape(question_data, (batchSizing, self.vocabularySize)), embeddings_B)
+            controlSignalU= tf.matmul(tf.reshape(question_data, (batchSizing, self.embedDim)), embeddings_B)
 
             # Get training control values
-            c_set = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.vocabularySize)), embeddings_C), (batchSizing, self.maxNumSentences, self.embedDim))
+            # (b, z, d) * (d, d)  = (b, z, d)
+            c_set = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.embedDim)), embeddings_A), (batchSizing, self.maxNumSentences, self.embedDim))
+
 
             # Add temporal information
-            memory_matrix_m = tf.add(memory_matrix_m, memoryA)
+            memoryMatrixM = tf.add(memoryMatrixM, memoryA)
             c_set = tf.add(c_set, memoryB)
+
 
             # Use memory multplied with control to select a story
             # (b,z,d) * (b,d,1) = (b,z,1)
-            memory_selection = tf.reshape(tf.matmul(memory_matrix_m, tf.reshape(control_signal_u, (batchSizing, self.embedDim, 1))), (batchSizing, self.maxNumSentences, 1))
+            memorySelection = tf.reshape(tf.matmul(memoryMatrixM, tf.reshape(controlSignalU, (batchSizing, self.embedDim, 1))), (batchSizing, self.maxNumSentences, 1))
+
             # Calculate which story to select
-            p = tf.nn.softmax(memory_selection, 1)
+            p = tf.nn.softmax(memorySelection, 1)
             # Select the story
             c_set = tf.transpose(c_set, (0, 2, 1))
             o = tf.reshape(tf.matmul(c_set, tf.reshape(p,(batchSizing, self.maxNumSentences, 1))),(batchSizing, self.embedDim))
             # Calculate the sum
             # (b, 1, d)
-            o_u_sum = tf.add(o, control_signal_u)
+            o_u_sum = tf.add(o, controlSignalU)
             # answerG => (b, z, d) , z = numberSentence => numberAnswerChoices in this case
-            # TODO: Modify to get: (b, d) * (b, d, z) => (b, z) => For every batch, there is an answer
-            predicted_answer_labels = tf.matmul(o_u_sum, tf.transpose(answerG, (0, 2, 1)))
-            # (b,1,d) * (d, V) = (b, V) => Choose a vocabulary as an answer
+
+            # TODO: Modify to get: (b, 1, d) * (b, d, a) => (b, a) => For every batch, there is an answer
+            predicted_answer_labels = tf.matmul(tf.reshape(o_u_sum, (batchSizing, 1, self.embedDim)), tf.transpose(answerG, (0, 2, 1)))
 
             # No idea if the bottom line is still needed
             # predicted_answer_labels = tf.reshape(predicted_answer_labels, [-1, 1, self.vocabularySize]) 
-            predicted_answer_labels = tf.reshape(predicted_answer_labels, [-1, 1, self.vocabularySize]) 
+            predicted_answer_labels = tf.reshape(predicted_answer_labels, [-1, 1, self.numAnswers]) 
             y_predicted = predicted_answer_labels
-            answer_data = tf.reshape(answer_data, [batchSizing, 1, self.vocabularySize])
-            y_target = answer_data
+
+            y_target = tf.reshape(proper_answer_data, [batchSizing, 1, self.numAnswers])
+
             # Multi-class Classification
             argyPredict  = tf.argmax(y_predicted,2)
             argyTarget = tf.argmax(y_target,2)
             correctPred = tf.equal(argyPredict, argyTarget)
             accuracy = tf.reduce_mean(tf.cast(correctPred, "float"))
+
             # Paper said it didn't average the loss, but it will reach infinity if batch size is too large
             loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits = y_predicted, labels = y_target))
+
             #Optimizer
-            optimizer = tf.train.AdagradOptimizer(learningRate).minimize(loss)
+            optimizer = tf.train.AdagradOptimizer(self.learningRate).minimize(loss)
+            '''
             '''
 
             # TODO: Uncomment once done fixing everything above
@@ -214,14 +242,15 @@ class MemN2N(object):
                     for step in xrange(self.numQuestions/self.batchSize):
                         train_story = self.X[step*self.batchSize:(step+1)*self.batchSize]
                         train_qu = np.reshape(self.q[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize,1, self.word2VecDim))
-                        train_answer = np.reshape(self.a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers,self.word2VecDim))
-                        feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
+                        train_answer = np.reshape(self.a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers, self.word2VecDim))
+                        train_answer_choices = np.reshape(self.answerChoices[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, self.numAnswers))
+                        
+                        feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer, proper_answer_data: train_answer_choices}
+                        # cannot feed 2,5,128 to ?,1,5
 
-                        tempPrint = session.run([tempDebug], feed_dict = feed_dictS)
-                        print tempPrint
-                        sys.exit(0)
+                        #tempPrint = session.run([tempDebug], feed_dict = feed_dictS)
+                        #print tempPrint
 
-                        '''
                         _,l,yhat,y, acc, argyhat, argy, correctPrediction = session.run([optimizer, loss, predicted_answer_labels, answer_data, accuracy, argyPredict, argyTarget, correctPred], feed_dict = feed_dictS)
 
                         #numCorrect += acc # DOesnt work for batchsize > 1
@@ -230,15 +259,12 @@ class MemN2N(object):
                         numCorrect += sum(correctPrediction)
                     #Store loss values for the epoch
                     loss_values.append(total_loss)
-                    accuracyThisEpoch = numCorrect/float(num_steps)
-                    valLoss, valAccuracy = session.run([loss, accuracy], feed_dict = feed_dictV)
+                    accuracyThisEpoch = numCorrect/float(self.numQuestions)
                     #testLoss, testAccuracy = session.run([loss, accuracy], feed_dict = feed_dictT)
-                    print "valLoss", valLoss
-                    print "valAcc", valAccuracy
                     #print "testLoss", testLoss
                     #print "testAcc", testAccuracy
                     print 'EpochNum:', currEpoch
-                    print 'LearningRate:', learningRate
+                    print 'LearningRate:', self.learningRate
                     print 'TotalLossCurrEpoch:', total_loss
                     print 'AccuracyCurrEpoch:', accuracyThisEpoch
                     total_loss = 0.0
@@ -246,18 +272,14 @@ class MemN2N(object):
                     #if not currEpoch % 25:
                     if not currEpoch % 15:
                         # LearningRate Annealing
-                        learningRate = learningRate/2.0 # 4.1 Annealing. 
+                        self.learningRate = self.learningRate/2.0 # 4.1 Annealing. 
                 print("Training done!")
-                '''
-            '''
             #Print loss plot
             pylab.ylabel("Loss")
             pylab.xlabel("Step #")
             loss_value_array = np.array(loss_values)
-            pylab.plot(np.arange(0,epoch_size, 1),loss_values)
+            pylab.plot(np.arange(0,self.numEpoch, 1),loss_values)
             pylab.show()  
-            '''
-
 
 def runTfIdf(trainPlots, testQuestions):
     # To output results in a beautified html file
