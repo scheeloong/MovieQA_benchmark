@@ -58,10 +58,11 @@ class MemN2N(object):
         self.word2VecDim = 0  # initialize
         self.embedDim = 0 #initialize
         self.maxNumSentences = 0  # initialize
-        self.maxNumAnswers = 0 # initialize
+        self.numAnswers = 0 # initialize
         self.numQuestions = 0 # initialize
         # Embeddings for the story matrices
         self.storyMatrices= {} # storyMatrices indexed by movieKey
+
         for movieKey in story:
             self.storyMatrices[movieKey] = self.w2v.get_vectors_for_raw_text(story[movieKey])
             self.maxNumSentences = max(self.maxNumSentences, self.storyMatrices[movieKey].shape[0])
@@ -71,23 +72,40 @@ class MemN2N(object):
             self.word2VecDim = self.storyMatrices[movieKey].shape[1]
             self.embedDim = self.word2VecDim # TODO: Confirm if its okay to set as the same
             break
+
         for currQA in self.qa:
             answers = self.w2v.get_text_vectors(currQA.answers) #print "ori question"
-            self.maxNumAnswers = answers.shape[0] 
+            self.numAnswers = answers.shape[0] 
             break;
-
-        # Form the 3 input matrices
+        for currQA in self.qa:
+            self.numQuestions += 1
         for currQA in self.qa:
             question = self.w2v.get_sentence_vector(currQA.question)
-            answers = self.w2v.get_text_vectors(currQA.answers) #print "ori question"
-            self.numQuestions += 1
-            #train_story = X[step*self.batchSize:(step+1)*self.batchSize]
-            #train_qu = np.reshape(q[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize,1, self.vocabularySize))
-            #train_answer = np.reshape(a[step*self.batchSize:(step+1)*self.batchSize], (self.batchSize, 1,self.vocabularySize))
+            answers = self.w2v.get_text_vectors(currQA.answers) 
         self.vocabularySize = self.w2v.getNumVocabulary()
+
+        # Form the 3 input matrices
+        self.X = np.zeros((self.numQuestions, self.maxNumSentences, self.word2VecDim))
+        self.q = np.zeros((self.numQuestions, self.word2VecDim))
+        self.a = np.zeros((self.numQuestions, self.numAnswers, self.word2VecDim))
+        numQ = 0
+        for currQA in self.qa:
+            question = self.w2v.get_sentence_vector(currQA.question)
+            answers = self.w2v.get_text_vectors(currQA.answers) 
+            self.q[numQ] = question
+            self.a[numQ] = answers
+            if self.storyMatrices[currQA.imdb_key].shape[0] != self.maxNumSentences:
+                difference = self.maxNumSentences - self.storyMatrices[currQA.imdb_key].shape[0]
+                temp = self.storyMatrices[currQA.imdb_key]
+                haha = np.zeros((difference, self.word2VecDim))
+                temp = np.vstack((temp, haha))
+                self.storyMatrices[currQA.imdb_key] = temp
+            self.X[numQ] = self.storyMatrices[currQA.imdb_key]
+            numQ += 1
+
         print "maxNumSentence", self.maxNumSentences
         print "word2VecDim", self.word2VecDim
-        print "numAnswers", self.maxNumAnswers
+        print "numAnswers", self.numAnswers
         print "vocabularySize", self.vocabularySize
         print "numQuestions", self.numQuestions
         # self.sentenceLength = 99999 # TODO: Confirm if dont need this
@@ -103,7 +121,7 @@ class MemN2N(object):
             #story_data = tf.placeholder(tf.float32, shape=[None, self.maxNumSentences, self.vocabularySize], name="storydata")
             story_data = tf.placeholder(tf.float32, shape=[None, self.maxNumSentences, self.embedDim], name="storydata")
             question_data = tf.placeholder(tf.float32, shape=[None, 1, self.embedDim], name="questiondata")
-            answer_data = tf.placeholder(tf.float32, shape=[None, self.maxNumAnswers, self.embedDim], name="answerdata") #1hot vector of answer
+            answer_data = tf.placeholder(tf.float32, shape=[None, self.numAnswers, self.embedDim], name="answerdata") #1hot vector of answer
 
             # Initialize random embeddings
             # Initialize as normal distribution with mean = 0 and std.deviation = 1 according to paper
