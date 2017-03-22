@@ -73,11 +73,11 @@ class MemN2N(object):
             answers = self.w2v.get_text_vectors(currQA.answers) #print "ori question"
             self.maxNumAnswers = answers.shape[0]
             break;
+        self.vocabularySize = self.w2v.getNumVocabulary()
         print "maxNumSentence", self.maxNumSentences
         print "word2VecDim", self.word2VecDim
         print "numAnswers", self.maxNumAnswers
-    
-        self.vocabularySize = 999999  # TODO: Confirm if need this
+        print "vocabularySize", self.vocabularySize
         # self.sentenceLength = 99999 # TODO: Confirm if dont need this
 
         self.buildGraphRunSess()
@@ -88,17 +88,18 @@ class MemN2N(object):
 
         with graph.as_default(), tf.device('/cpu:0'):
             # TODO: Figure out if the sizes below are right
-            story_data = tf.placeholder(tf.float32, shape=[None, self.maxNumSentences, self.vocabularySize], name="storydata")
-            question_data = tf.placeholder(tf.float32, shape=[None, 1, self.vocabularySize], name="questiondata")
-            answer_data = tf.placeholder(tf.float32, shape=[None, 1, self.vocabularySize], name="answerdata") #1hot vector of answer
-            '''
+            #story_data = tf.placeholder(tf.float32, shape=[None, self.maxNumSentences, self.vocabularySize], name="storydata")
+            story_data = tf.placeholder(tf.float32, shape=[None, self.maxNumSentences, self.embedDim], name="storydata")
+            question_data = tf.placeholder(tf.float32, shape=[None, 1, self.embedDim], name="questiondata")
+            answer_data = tf.placeholder(tf.float32, shape=[None, self.maxNumAnswers, self.embedDim], name="answerdata") #1hot vector of answer
 
             # Initialize random embeddings
             # Initialize as normal distribution with mean = 0 and std.deviation = 1 according to paper
             # To perform matrix multiplication on higher dimensions
             batchSizing= tf.shape(story_data)[0]
-            # TODO: Initialize as pre-trained word vector
-            Z = tf.Variable(tf.truncated_normal([self.vocabularySize, self.word2VecDim]))
+
+            # Parameters to train
+            Z = tf.Variable(tf.truncated_normal([self.vocabularySize, self.word2VecDim])) # TODO: Initialize as pre-trained word vector
             T = tf.Variable(tf.truncated_normal([self.word2VecDim, self.embedDim]))
             # To encode temporal information on which sentence we are currently on
             memoryA = tf.Variable(tf.truncated_normal([self.maxNumSentences, self.embedDim], stddev=0.05))
@@ -111,6 +112,7 @@ class MemN2N(object):
             embeddings_C = tf.matmul(Z, T)
             embeddings_F = tf.matmul(Z, T)
 
+            '''
             # (b, z, v) * (v, d)  = (b, z, d)
             answerG = tf.reshape(tf.matmul(tf.reshape(story_data, (batchSizing*self.maxNumSentences,self.vocabularySize)), embeddings_F), (batchSizing, self.maxNumSentences, self.embedDim))
 

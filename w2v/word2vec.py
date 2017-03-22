@@ -2,7 +2,6 @@ import numpy as np
 import pickle
 import MovieQA
 
-
 class Word2Vec(object):
     def __init__(self, extension='plt', postprocess=False):
         # Filenames & Constants
@@ -11,16 +10,26 @@ class Word2Vec(object):
         self.SYMBOLS_TO_REMOVE = '"#$%&()*+,/:;<=>@[\]^_`{|}~-' + "'?!"
 
         # Get word2vec embeddings
-        self.embeddings = []
+        # This is the embeddings that are trained,
+        # you access it using the given functions and the given IDs
+        self.embeddings = [] # (numWords * embeddingDimensions)
         with np.load(EMBED_FILE) as f:
             self.embeddings = f['embed']
             print('Embeddings loaded')
 
         # Get the word to word-id mappings
-        self.id_map = self.load_obj(ID_MAP_FILE)
+        # Basically, this is a map and isn't train
+        self.id_map = self.load_obj(ID_MAP_FILE) # (numWords *  embeddingDimensions)
 
         if postprocess:
             self._postprocess()
+            print "Self embedding size and values"
+            print(self.embeddings.shape)
+            print("Self ID Map") # A dictionary
+            print(len(self.id_map))
+
+    def getNumVocabulary(self):
+        return len(self.id_map)
 
     def load_obj(self, name):
         with open(name, 'rb') as f:
