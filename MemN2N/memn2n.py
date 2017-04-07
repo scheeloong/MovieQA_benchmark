@@ -14,9 +14,9 @@ import re # Split by tabs
 import string # To remove punctuation
 
 from matplotlib import pylab #from sklearn.manifold import TSNE
-
 from collections import OrderedDict, defaultdict, Counter, deque
 from random import shuffle
+import matplotlib.pyplot as plt
 
 class BabiParser(object):
     def __init__(self):
@@ -24,6 +24,7 @@ class BabiParser(object):
         self.fileNames = ["qa1_single-supporting-fact_train.txt"]
         #self.fileNames = ["temp.txt"]
         self.vocabularyToIndex = {}
+        self.indexToVocabulary = {}
         self.numWords = 1 # Keep 0th index to represent no word
         self.numStory = 0
         self.maxSentencePerStory = 0
@@ -33,7 +34,7 @@ class BabiParser(object):
         # Parse the vocabulary
         self.parseBabiTaskVocabulary()
         # Parse the vectors to get X, q, a (input, question, answer) sentence vectors
-        self.X, self.q, self.a, self.XSentence, self.qSentence, self.aSentence = self.parseBabiTaskVectors()
+        self.questions, self.plot, self.X, self.q, self.a, self.XSentence, self.qSentence, self.aSentence = self.parseBabiTaskVectors()
         print 'numWords:', self.numWords
         print 'numStory:', self.numStory
         print 'maxSentencePerStory:', self.maxSentencePerStory
@@ -53,12 +54,13 @@ class BabiParser(object):
         '''
 
     def getBabiTask(self):
-        return self.X, self.q, self.a, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords, self.XSentence, self.qSentence
+        return self.questions, self.plot, self.X, self.q, self.a, self.maxSentencePerStory, self.maxWordInSentence, self.numQuestion, self.numWords, self.XSentence, self.qSentence
 
     def insertVocabulary(self, word):
         if word in self.vocabularyToIndex:
             return
         self.vocabularyToIndex[word] = self.numWords
+        self.indexToVocabulary[self.numWords] = word
         self.numWords += 1
         return
 
@@ -145,6 +147,10 @@ class BabiParser(object):
         currXSent = np.zeros((self.maxSentencePerStory, self.maxWordInSentence))
         numQ = 0
 
+        currPlot = ""
+        plots = []
+        questions = []
+
         # Create the matrix
         for currFile in self.fileNames:
             fd = open("en/" + currFile, "r")
@@ -157,6 +163,7 @@ class BabiParser(object):
                     currXSent = np.zeros((self.maxSentencePerStory, self.maxWordInSentence))
                     # Initialize the story to be at the 0th position
                     numXStory = 0
+                    currPlot = ""
 
                 # A question
                 if '\t' in currLine:
@@ -179,6 +186,8 @@ class BabiParser(object):
                     # Append current X into X
                     X[numQ] = currX
                     XSent[numQ] = currXSent
+                    plots.append(currPlot)
+                    questions.append(question)
 
                     # Append q into currentQ
                     q[numQ] = questionVec
@@ -191,12 +200,14 @@ class BabiParser(object):
                 else:
                     sentence = currLine.split(' ', 1)[1].strip()
                     sentence = sentence.translate(None, string.punctuation)
+                    currPlot += sentence
+                    currPlot += ". \n"
                     sentenceVec = self.getSentenceOneHotVector(sentence)
                     sentenceVecSent = self.getSentenceVector(sentenceVec)
                     currX[numXStory] = sentenceVec
                     currXSent[numXStory] = sentenceVecSent 
                     numXStory += 1
-        return X, q, a, XSent, qSent, aSent
+        return questions, plots, X, q, a, XSent, qSent, aSent
 
 def ShuffleBatches(trainData, trainDataTwo, trainTarget):
     # Gets the state as the current time
@@ -211,7 +222,8 @@ def ShuffleBatches(trainData, trainDataTwo, trainTarget):
 if __name__=="__main__":
     B = BabiParser()
     MIN_WORD_FREQEUNCY = 5
-    X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE, XSent, qSent, = B.getBabiTask()
+    questions, plots, X, q, a, max_num_sentences, SENTENCE_LENGTH, num_steps, VOCABULARY_SIZE, XSent, qSent, = B.getBabiTask()
+    numQuestion = num_steps
     valStart = (num_steps*8)/10
     testStart = (num_steps*9)/10
     valX = X[valStart:testStart]
@@ -238,7 +250,9 @@ if __name__=="__main__":
     a = a[:testStart]
     num_steps = testStart
 
-    epoch_size = 30
+    epoch_size = 50
+    # epoch_size = 20
+    numEpoch = epoch_size
     print 'epoch size is', epoch_size
 
     #Graph parameters
@@ -345,6 +359,8 @@ if __name__=="__main__":
         #optimizer = tf.train.GradientDescentOptimizer(learningRate).minimize(loss)
 
         loss_values = []
+        validLossValues = []
+        validAccuracies = []
         #Train the model
         with tf.Session(graph=graph) as session:
             #Initialize variables
@@ -424,6 +440,8 @@ if __name__=="__main__":
                 #testLoss, testAccuracy = session.run([loss, accuracy], feed_dict = feed_dictT)
                 print "valLoss", valLoss
                 print "valAcc", valAccuracy
+                validLossValues.append(valLoss)
+                validAccuracies.append(valAccuracy)
                 #print "testLoss", testLoss
                 #print "testAcc", testAccuracy
                 print 'EpochNum:', currEpoch
@@ -438,11 +456,60 @@ if __name__=="__main__":
                     learningRate = learningRate/2.0 # 4.1 Annealing. 
              
             print("Training done!")
+            while True:
+                batch_size = 1
+                print('SOON')
+                valStart = (num_steps*8)/10
+                testStart = (num_steps*9)/10
+                for currStep in xrange((num_steps - valStart)/batch_size):
+                    step = currStep + valStart
+                    train_story = X[step*batch_size:(step+1)*batch_size]
+                    #train_qu = np.reshape(q[step*batch_size:(step+1)*batch_size], (batch_size,1,SENTENCE_LENGTH))
+                    train_qu = np.reshape(q[step*batch_size:(step+1)*batch_size], (batch_size,1, VOCABULARY_SIZE))
+                    train_answer = np.reshape(a[step*batch_size:(step+1)*batch_size], (batch_size, 1,VOCABULARY_SIZE))
+
+                    print plots[step]
+                    # TODO: lala get giveninput
+                    userInput = "Where is everything?"
+                    print "Please input question"
+                    userInput = questions[step]
+                    print "Example question: " + userInput
+                    userInput = raw_input()
+                    sentence = userInput.split(' ', 1)[1].strip()
+                    sentence = sentence.translate(None, string.punctuation)
+                    rowVector = list()
+                    for word in sentence.split():
+                        if word in B.vocabularyToIndex:
+                            rowVector.append(B.vocabularyToIndex[word])
+                    #sentenceVec = B.convertToOneHot(np.array(rowVector))
+                    oneHotVectors = np.eye(B.numWords)[np.array(rowVector)]
+                    sentenceVec = np.sum(oneHotVectors, 0)
+                    train_qu = np.reshape(sentenceVec, (batch_size,1, VOCABULARY_SIZE))
+                    feed_dictS = {story_data: train_story, question_data: train_qu, answer_data: train_answer}
+                    l,yhat,y, acc, argyhat, argy, correctPrediction = session.run([loss, predicted_answer_labels, answer_data, accuracy, argyPredict, argyTarget, correctPred], feed_dict = feed_dictS)
+                    getKey = argyhat[0][0]
+                    print "answer: ", B.indexToVocabulary[getKey]
+                    print "\n"
+                    # PRINT THE ANSWER IN TERMS OF ITS WORDS
 
         #Print loss plot
-        pylab.ylabel("Loss")
-        pylab.xlabel("Step #")
+        plt.figure(0)
+        plt.ylabel("Training Loss")
+        plt.xlabel("Epoch #")
         loss_value_array = np.array(loss_values)
-        pylab.plot(np.arange(0,epoch_size, 1),loss_values)
-           
-        pylab.show()  
+        plt.plot(np.arange(0,numEpoch, 1),loss_values)
+        plt.savefig("trainLossPlot" + str(numEpoch) + ".png")
+        plt.figure(1)
+        plt.ylabel("Valid Loss")
+        plt.xlabel("Epoch #")
+        loss_value_array = np.array(validLossValues)
+        plt.plot(np.arange(0,numEpoch, 1),validLossValues)
+        plt.savefig("validLossPlot" + str(numEpoch) + ".png")
+
+
+        plt.figure(2)
+        plt.ylabel("Valid Accuracy")
+        plt.xlabel("Epoch #")
+        plt.plot(np.arange(0,numEpoch, 1),validAccuracies)
+        plt.savefig("validAccuracyPlot" + str(numEpoch) + ".png")
+
