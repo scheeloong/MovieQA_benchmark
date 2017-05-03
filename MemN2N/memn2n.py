@@ -250,7 +250,7 @@ if __name__=="__main__":
     a = a[:testStart]
     num_steps = testStart
 
-    epoch_size = 50
+    epoch_size = 30
     # epoch_size = 20
     numEpoch = epoch_size
     print 'epoch size is', epoch_size
@@ -475,7 +475,12 @@ if __name__=="__main__":
                     userInput = questions[step]
                     print "Example question: " + userInput
                     userInput = raw_input()
-                    sentence = userInput.split(' ', 1)[1].strip()
+                    '''
+                    print userInput.split(' ')
+                    print userInput.split(' ', 1)
+                    print userInput.split(' ', 1)[1]
+                    '''
+                    sentence = userInput.strip()
                     sentence = sentence.translate(None, string.punctuation)
                     rowVector = list()
                     for word in sentence.split():

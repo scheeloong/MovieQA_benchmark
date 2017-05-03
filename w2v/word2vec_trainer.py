@@ -14,7 +14,7 @@ from w2v_utils import tokenize_text, load_text8, load_plots, save_obj, get_batch
 get_ipython().magic('matplotlib inline')
 
 class Word2Vec():
-    def __init__(self, name="testing", size=40000, thresh=3)
+    def __init__(self, name="testing", size=40000, thresh=3):
         self.name = name
         ckpt_file = "w2v_%s.ckpt" % self.name
         id_map_file = "id_map_%s.pkl" % self.name
@@ -202,6 +202,3 @@ class Word2Vec():
         pylab.ylabel("loss")
         pylab.xlabel("steps")
         pylab.plot(np.arange(1,num_steps-1, 4001), loss_data)
-
-
-

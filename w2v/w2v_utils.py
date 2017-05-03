@@ -4,7 +4,6 @@ from collections import Counter
 
 exclude = '!"#$%&()*+,./:;<=>?@[\]^_`{|}~-' + "'"
 
-
 def tokenize_text(words, id_map):
     ''' Convert list of words into list of tokens/word-ids.
     Args:

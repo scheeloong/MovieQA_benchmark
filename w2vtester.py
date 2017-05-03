@@ -1,19 +1,30 @@
 import MovieQA
 import numpy as np
 from w2v.word2vec import Word2Vec
-
+import sys
 
 class W2VTester(object):
 
     def __init__(self, story_raw, qa, extension='plt', postprocess=True):
         self.qa = qa
         self.w2v = Word2Vec(extension, postprocess=postprocess)
+        self.maxSentenceLength = 0
 
         # Build each plot into a matrix of sentence embeddings.
         self.story_matrices = {}
         for imdb_key in story_raw:
             self.story_matrices[imdb_key] = self.w2v.get_vectors_for_raw_text(story_raw[
+            
                                                                               imdb_key])
+
+            #print 'raw plot'
+            #print story_raw[imdb_key]
+            # print 'processed plot'
+            #print self.story_matrices[imdb_key]
+            print self.story_matrices[imdb_key].shape
+            self.maxSentenceLength = max(self.maxSentenceLength, self.story_matrices[imdb_key].shape[0])
+            # sys.exit(0)
+        print self.maxSentenceLength
 
     def score(self, q):
         ''' Make a prediction for the QA.
@@ -21,6 +32,16 @@ class W2VTester(object):
         # Process question and answers.
         question = self.w2v.get_sentence_vector(q.question)
         answers = self.w2v.get_text_vectors(q.answers)
+        #print "ori question"
+        #print q.question
+        print "parsed question"
+        #print question
+        print question.shape
+        #print "ori answer"
+        #print q.answers
+        print "parsed answer"
+        #print answers
+        print answers.shape
 
         # Calculate similarity
         qscore = self.story_matrices[q.imdb_key].dot(question).reshape(-1, 1)

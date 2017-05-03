@@ -58,6 +58,28 @@ class MovieTokenizer(object):
             vocabulary.add(lemmatizedLowerWord)
         return vocabulary
 
+    def tokenizeAlphanumericLowerList(self, sentences):
+        """
+        Returns a list of unique words broken up after being tokenize
+        by alphanumeric and lowerCase
+        """
+        vocabulary = list()
+        for word in self.tokenizer.tokenize(sentences):
+            lemmatizedLowerWord = self.lemmatizer.lemmatize(word.lower())
+            vocabulary.append(lemmatizedLowerWord)
+        return vocabulary
+
+    def tokenizedAlphanumericPairs(self, sentences):
+        """
+        Returns a list of unique words broken up after being tokenize
+        by alphanumeric and lowerCase
+        """
+        vocabulary = list()
+        for word in self.tokenizer.tokenize(sentences):
+            lemmatizedLowerWord = self.lemmatizer.lemmatize(word.lower())
+            vocabulary.append(lemmatizedLowerWord)
+        return (self.tokenizer.tokenize(sentences), vocabulary)
+
     def tokenizeOrderedAlphanumericLower(self, sentences):
         """
         Returns a set of unique words broken up after being tokenize

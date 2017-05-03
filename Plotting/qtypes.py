@@ -78,4 +78,3 @@ if __name__=="__main__":
     #plt.legend(Legend_string, labels2, loc = "best") 
     plt.axis('equal')
     plt.show()
-

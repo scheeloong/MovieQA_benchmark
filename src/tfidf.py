@@ -106,6 +106,25 @@ class TfIdf(object):
             return count
         return np.log10(len(self.story)/count)
 
+    def getCleanPlot(self, movieKey):
+        currMoviePlots = self.story[movieKey]
+        cleanSentence = []
+        originalSentence = []
+        for currPlot in currMoviePlots:
+            currOrig, currSentence = self.tokenizer.tokenizedAlphanumericPairs(currPlot)
+            for i, word in enumerate(currSentence):
+                if self.tfIdfMatrix.contains(word, movieKey):
+                    cleanSentence.append(word)
+                    originalSentence.append(currOrig[i])
+        return originalSentence, cleanSentence
+
+    def getWordVectors(self, movieKey, listOfWords):
+        arr = []
+        for currWord in listOfWords:
+            if self.tfIdfMatrix.contains(currWord, movieKey):
+                arr.append(self.tfIdfMatrix.getScore(currWord, movieKey))
+        return arr
+
     def getSentenceVector(self, movieKey, sentence):
         sentenceVec = np.zeros(self.numberOfWords)
         cleanSentence = self.tokenizer.tokenizeAlphanumericLower(sentence)
